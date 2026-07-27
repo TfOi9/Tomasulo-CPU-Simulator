@@ -11,10 +11,12 @@ std::string get_time() {
     return oss.str();
 }
 
-TraceFile::TraceFile(const RegFile& regf): regf(regf) {
-    file.open("tr-" + get_time() + ".trace", std::ios::trunc);
-    if (!file) {
-        assert(false);
+TraceFile::TraceFile(const RegFile& regf, bool trace_enabled): regf(regf), trace_enabled(trace_enabled) {
+    if (trace_enabled) {
+        file.open("tr-" + get_time() + ".trace", std::ios::trunc);
+        if (!file) {
+            assert(false);
+        }
     }
 }
 
@@ -25,6 +27,7 @@ TraceFile::~TraceFile() {
 }
 
 void TraceFile::dump(uint32_t pc) {
+    if (!trace_enabled) return;
     file << "PC = " << pc << std::endl;
     file << regf.dump() << std::endl;
 }

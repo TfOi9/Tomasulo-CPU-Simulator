@@ -18,7 +18,7 @@ uint32_t DataMemory::read_half(size_t index, bool is_unsigned) const {
     assert(index % 2 == 0);
     uint32_t half = (mem.read_byte(index + 1) << 8) |
                      mem.read_byte(index);
-    if (is_unsigned && half & 0x8000) {
+    if (!is_unsigned && half & 0x8000) {
         half |= 0xFFFF0000;
     }
     return half;
@@ -26,7 +26,7 @@ uint32_t DataMemory::read_half(size_t index, bool is_unsigned) const {
 
 uint32_t DataMemory::read_byte(size_t index, bool is_unsigned) const {
     uint32_t byte = mem.read_byte(index);
-    if (is_unsigned && byte & 0x80) {
+    if (!is_unsigned && byte & 0x80) {
         byte |= 0xFFFFFF00;
     }
     return byte;

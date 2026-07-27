@@ -25,7 +25,7 @@ class CPUInterpreter {
     bool trace;
 
 public:
-    CPUInterpreter(bool trace = true) : tf(regf), pc(0), halted(false), trace(trace) {}
+    CPUInterpreter(bool trace = true) : tf(regf, trace), pc(0), halted(false), trace(trace) {}
     // load program file from path
     void load_program(const std::string& path);
     // run one step

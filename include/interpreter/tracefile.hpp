@@ -10,9 +10,11 @@ class TraceFile {
     const RegFile& regf;
     // the file to dump to
     std::ofstream file;
+    // trace enabled flag
+    bool trace_enabled;
 
 public:
-    TraceFile(const RegFile& regf);
+    TraceFile(const RegFile& regf, bool trace_enabled);
     ~TraceFile();
     // dump the registers to the file
     void dump(uint32_t pc);
