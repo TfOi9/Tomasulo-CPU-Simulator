@@ -1,0 +1,6 @@
+.DS_Store
+data/
+temp/
+build/
+unit_tests/
+*.dSYM
