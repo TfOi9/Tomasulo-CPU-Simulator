@@ -16,7 +16,6 @@ void SimMemory::write_byte(size_t index, uint8_t val) {
 }
 
 void SimMemory::load_hex_data(const std::string &data) {
-    size_t len = data.size();
     std::stringstream ss(data);
     std::string token;
     size_t mempos = 0;
@@ -26,8 +25,8 @@ void SimMemory::load_hex_data(const std::string &data) {
             break;
         }
         if (token[0] == '@') {
-            size_t newpos = std::stoull(token.substr(1, token.size() - 1));
-            assert(newpos > 0 && newpos < MEM_SIZE);
+            size_t newpos = std::stoull(token.substr(1, token.size() - 1), nullptr, 16);
+            assert(newpos < MEM_SIZE);
             mempos = newpos;            
         } else {
             uint8_t byte = to_byte(token);

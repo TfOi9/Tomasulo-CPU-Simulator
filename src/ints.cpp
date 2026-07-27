@@ -3,7 +3,7 @@
 #include <cassert>
 
 bool is_valid_hex_char(char ch) {
-    return ch >= '0' && ch <= '9' || ch >= 'A' && ch <= 'F';
+    return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F');
 }
 
 uint8_t to_bits(char ch) {
