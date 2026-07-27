@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <cassert>
+#include <iostream>
 
 #include "../../include/decoder/instr.hpp"
 #include "../../include/alu/alucomp.hpp"
@@ -32,6 +33,8 @@ void CPUInterpreter::step() {
     // check halt
     if (ins.header.type == InstrType::HALT) {
         halted = true;
+        uint8_t ret = uint8_t(regf.read_reg(10) & 0xFF);
+        std::cout << int(ret) << std::endl;
         return;
     }
 
@@ -191,4 +194,5 @@ void CPUInterpreter::run(int max_step = 10000) {
             return;
         }
     }
+    std::cerr << "REACHING MAX STEP" << std::endl;
 }
