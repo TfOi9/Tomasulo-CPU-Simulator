@@ -29,7 +29,7 @@ enum class InstrType {
 
 // Place to execute the instruction
 enum class InstrPlace {
-    ALU, LSB, REG, BRANCH, NOP
+    ALU, LSB, REG, BRANCH, NOP,
 };
 
 // Header for a instruction
@@ -95,8 +95,8 @@ constexpr InstrPlace instr_place_mapping[] = {
     // B-type branch → BRANCH
     InstrPlace::BRANCH, InstrPlace::BRANCH, InstrPlace::BRANCH, InstrPlace::BRANCH, InstrPlace::BRANCH,
     InstrPlace::BRANCH, InstrPlace::BRANCH, InstrPlace::BRANCH,
-    // U-type → ALU, pseudo/custom → NOP, unknown → NOP
-    InstrPlace::ALU, InstrPlace::ALU, InstrPlace::NOP, InstrPlace::NOP,
+    // U-type → REG, pseudo/custom → NOP, unknown → NOP
+    InstrPlace::REG, InstrPlace::REG, InstrPlace::NOP, InstrPlace::NOP,
     InstrPlace::NOP,
 };
 

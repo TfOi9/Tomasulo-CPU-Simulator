@@ -75,6 +75,7 @@ Instr Instr::decode(uint32_t raw) {
             break;
         case 0b0010011: // arith-I
             imm = int32_t(raw) >> 20;
+            rs2 = 0;
             switch (funct3) {
                 case 0b000:
                     // ADDI
@@ -127,6 +128,7 @@ Instr Instr::decode(uint32_t raw) {
             break;
         case 0b0000011: // mem-I
             imm = int32_t(raw) >> 20;
+            rs2 = 0;
             switch (funct3) {
                 case 0b000:
                     // LB
@@ -153,6 +155,7 @@ Instr Instr::decode(uint32_t raw) {
             }
             break;
         case 0b0100011: // S
+            rd = 0;
             imm = int32_t(
                 (((raw >> 25) & 0x7F) << 5)|
                 ((raw >> 7) & 0x1F)
@@ -183,6 +186,7 @@ Instr Instr::decode(uint32_t raw) {
                 (((raw >> 8) & 0xF) << 1)
             );
             imm = (imm << 19) >> 19;
+            rd = 0;
             switch (funct3) {
                 case 0b000:
                     // BEQ
@@ -220,19 +224,23 @@ Instr Instr::decode(uint32_t raw) {
                 (((raw >> 21) & 0x3FF) << 1) 
             );
             imm = (imm << 11) >> 11;
+            rs1 = rs2 = 0;
             type = InstrType::JAL;
             break;
         case 0b1100111: // JALR
             assert(funct3 == 0b000);
             imm = int32_t(raw) >> 20;
+            rs2 = 0;
             type = InstrType::JALR;
             break;
         case 0b0010111: // AUIPC
             imm = int32_t(raw & 0xFFFFF000);
+            rs1 = rs2 = 0;
             type = InstrType::AUIPC;
             break;
         case 0b0110111: // LUI
             imm = int32_t(raw & 0xFFFFF000);
+            rs1 = rs2 = 0;
             type = InstrType::LUI;
             break;
         default:
