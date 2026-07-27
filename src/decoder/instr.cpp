@@ -11,7 +11,7 @@ Instr Instr::decode(uint32_t raw) {
         };
     }
 
-    uint8_t opcode = raw & 0x3F;
+    uint8_t opcode = raw & 0x7F;
     uint8_t funct7 = raw >> 25;
     uint8_t funct3 = (raw >> 12) & 0x7;
     uint8_t rd = (raw >> 7) & 0x1F;
