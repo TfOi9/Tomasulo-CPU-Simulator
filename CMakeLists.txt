@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 3.16)
+project(TomasuloCPUSimulator)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/unit_tests/CMakeLists.txt")
+    option(BUILD_TESTS "Build unit tests" ON)
+    if(BUILD_TESTS)
+        enable_testing()
+        add_subdirectory(unit_tests)
+    endif()
+endif()
