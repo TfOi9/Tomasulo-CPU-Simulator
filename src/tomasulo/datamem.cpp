@@ -25,7 +25,7 @@ void SimDataMemory::issue_write_next(size_t addr, uint32_t val, InstrType type) 
 
     next = MemRq {
         true,
-        true,
+        false,
         false,
         type,
         addr,

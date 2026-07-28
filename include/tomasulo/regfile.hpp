@@ -15,6 +15,8 @@ class ArchRegFile {
     std::array<uint32_t, FILE_SIZE> new_regs;
 
 public:
+    // prepare next state as copy of current state
+    void prepare_next();
     // flush zero into x0 in next
     void flush_zero();
     // read register data from current state
