@@ -50,8 +50,6 @@ public:
 
     // check if sb is full
     bool is_full() const;
-    // flush all entries for restoring
-    void flush_next();
     // compute next state
     void compute_next();
     // flip curr and next states
