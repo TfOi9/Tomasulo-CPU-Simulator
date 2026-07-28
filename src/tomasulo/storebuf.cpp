@@ -102,7 +102,7 @@ bool StoreBuffer::all_addrs_known() const {
 
 bool StoreBuffer::is_full() const {
     for (size_t i = 0; i < SB_SIZE; i++) {
-        if (!sb[i].busy) return false;
+        if (!next_sb[i].busy) return false;
     }
     return true;
 }

@@ -84,6 +84,7 @@ void LSRS::execute(StoreBuffer &sb, SimDataMemory &dmem) {
         // calculate address
         if (!entry.addr_ready && entry.vj_ready) {
             entry.addr = entry.vj + uint32_t(entry.imm);
+            entry.addr_ready = true;
             if (!entry.is_load) {
                 sb.set_addr_ready_next(entry.rob_tag, entry.addr);
             }
