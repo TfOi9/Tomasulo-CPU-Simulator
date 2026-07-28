@@ -102,9 +102,10 @@ const ROBEntry& ReorderBuf::head_entry() const {
     return rob[head];
 }
 
-void ReorderBuf::commit() {
+bool ReorderBuf::commit() {
     assert(can_commit());
     ROBEntry& entry = rob[head];
+    bool mispredict = false;
 
     // write arch reg (JAL/JALR are both branch and have dest_reg)
     if (!entry.is_store && entry.dest_reg != 0) {
@@ -118,6 +119,7 @@ void ReorderBuf::commit() {
             flush_from_next(entry.tag);
             // redirect pc to this instruction's correct target
             // TODO
+            mispredict = true;
         }
     }
 
@@ -126,6 +128,7 @@ void ReorderBuf::commit() {
     next_rob[head].busy = false;
     head = (head + 1) % ROB_SIZE;
     head_next = head;
+    return mispredict;
 }
 
 void ReorderBuf::flush_from_next(uint32_t branch_tag) {
@@ -141,6 +144,7 @@ void ReorderBuf::flush_from_next(uint32_t branch_tag) {
     assert(rob[index].is_branch == true);
 
     for (size_t i = (index + 1) % ROB_SIZE; i != tail; i = (i + 1) % ROB_SIZE) {
+        rob[i].busy = false;
         next_rob[i].busy = false;
     }
     tail_next = (index + 1) % ROB_SIZE;

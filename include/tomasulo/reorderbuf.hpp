@@ -89,8 +89,8 @@ public:
     bool can_commit() const;
     // return head
     const ROBEntry& head_entry() const;
-    // confirm commit
-    void commit();
+    // confirm commit. returns true if a branch mispredict occurred
+    bool commit();
 
     // --- mistaken prediction & restore ---
     // flush all entries in branch_tag+1..=tail-1, clear tail
