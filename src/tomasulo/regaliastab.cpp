@@ -4,8 +4,8 @@
 
 RegAliasTab::RegAliasTab() {
     for (size_t i = 1; i < RAT_SIZE; i++) {
-        rat[i] = {false, 0, 0};
-        next_rat[i] = {false, 0, 0};
+        rat[i] = {true, 0, 0};
+        next_rat[i] = {true, 0, 0};
     }
     rat[0] = {true, 0, 0};
     next_rat[0] = {true, 0, 0};
