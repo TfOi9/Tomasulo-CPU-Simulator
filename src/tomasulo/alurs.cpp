@@ -121,7 +121,7 @@ void ALURS::execute() {
 }
 
 std::array<CDBEntry, ALURS::ALURS_SIZE> ALURS::write_back() {
-    std::array<CDBEntry, ALURS_SIZE> arr;
+    std::array<CDBEntry, ALURS_SIZE> arr{};
     int index = 0;
     for (size_t i = 0; i < ALURS_SIZE; i++) {
         if (next_alurs[i].done) {

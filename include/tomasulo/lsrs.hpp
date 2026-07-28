@@ -49,6 +49,8 @@ class LSRS {
     std::array<LSRSEntry, LSRS_SIZE> lsrs;
     // next state lsrs entries
     std::array<LSRSEntry, LSRS_SIZE> next_lsrs;
+    // helper: check if older store conflicts with load
+    bool older_store_conflict(const LSRSEntry& load_entry);
 
 public:
     // allocates a new lsrs entry
@@ -58,7 +60,7 @@ public:
     // listen to the cdb broadcast, catch if match
     void listen_cdb(uint32_t cdb_tag, uint32_t cdb_val);
     // execute entries that are ready
-    void execute(const StoreBuffer& sb, SimDataMemory& dmem);
+    void execute(StoreBuffer& sb, SimDataMemory& dmem);
     // write back done entries, returning cdb broadcast list
     std::array<CDBEntry, LSRS_SIZE> write_back();
     // check if lsrs is full
