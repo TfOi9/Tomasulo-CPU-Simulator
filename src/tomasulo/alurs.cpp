@@ -125,17 +125,16 @@ std::array<CDBEntry, ALURS::ALURS_SIZE> ALURS::write_back() {
     int index = 0;
     for (size_t i = 0; i < ALURS_SIZE; i++) {
         if (!next_alurs[i].busy || !next_alurs[i].done) continue;
-            ALURSEntry& entry = next_alurs[i];
-            arr[index] = {
-                true,
-                entry.rob_tag,
-                entry.result,
-                entry.is_branch,
-                entry.branch_actual_taken,
-                entry.branch_target
-            };
-            index++;
-        }
+        ALURSEntry& entry = next_alurs[i];
+        arr[index] = {
+            true,
+            entry.rob_tag,
+            entry.result,
+            entry.is_branch,
+            entry.branch_actual_taken,
+            entry.branch_target
+        };
+        index++;
     }
     return arr;
 }

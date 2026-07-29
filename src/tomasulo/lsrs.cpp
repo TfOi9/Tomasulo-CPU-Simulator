@@ -149,17 +149,16 @@ std::array<CDBEntry, LSRS::LSRS_SIZE> LSRS::write_back() {
     int index = 0;
     for (size_t i = 0; i < LSRS_SIZE; i++) {
         if (!next_lsrs[i].busy || !next_lsrs[i].done || !next_lsrs[i].is_load) continue;
-            LSRSEntry& entry = next_lsrs[i];
-            arr[index] = {
-                true,
-                entry.rob_tag,
-                entry.mem_result,
-                false,
-                false,
-                0
-            };
-            index++;
-        }
+        LSRSEntry& entry = next_lsrs[i];
+        arr[index] = {
+            true,
+            entry.rob_tag,
+            entry.mem_result,
+            false,
+            false,
+            0
+        };
+        index++;
     }
     return arr;
 }
