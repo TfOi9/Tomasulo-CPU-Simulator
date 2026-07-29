@@ -43,8 +43,11 @@ struct LSRSEntry {
 
 // Load & Save Reservation Station
 class LSRS {
+public:
     // lsrs size
     constexpr static size_t LSRS_SIZE = 8;
+
+private:
     // current lsrs entries
     std::array<LSRSEntry, LSRS_SIZE> lsrs;
     // next state lsrs entries

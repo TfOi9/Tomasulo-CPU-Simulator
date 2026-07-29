@@ -41,8 +41,11 @@ struct ALURSEntry {
 
 // ALU Reservation Station
 class ALURS {
+public:
     // alurs size
     constexpr static size_t ALURS_SIZE = 8;
+    
+private:
     // current alurs entries
     std::array<ALURSEntry, ALURS_SIZE> alurs;
     // next state alurs entries
