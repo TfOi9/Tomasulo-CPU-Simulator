@@ -66,7 +66,7 @@ class TomasuloCPU {
 
 public:
     // constructor
-    TomasuloCPU(bool trace = true);
+    TomasuloCPU(bool trace = false);
     // destructor
     ~TomasuloCPU();
     // load a program .data from path
@@ -74,6 +74,6 @@ public:
     // run a cycle
     void cycle();
     // run until halt or reached limits
-    void run(int max_cycles);
+    void run(int max_cycles = 1000000);
 
 };
