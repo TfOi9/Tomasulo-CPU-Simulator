@@ -1,6 +1,7 @@
 #include "../../include/tomasulo/reorderbuf.hpp"
 
 #include <cassert>
+#include <iostream>
 
 int ReorderBuf::alloc(InstrType type, uint8_t dest_reg,
         uint32_t pc, bool is_branch, bool branch_pred_taken,
@@ -53,6 +54,21 @@ void ReorderBuf::write_result(uint32_t tag, uint32_t val) {
             index = i;
             break;
         }
+    }
+    
+    if (index == ROB_SIZE) {
+        std::cerr << "[write_result] tag=" << tag << " val=" << val
+                  << " NOT FOUND in rob. head=" << head << " tail=" << tail
+                  << " head_next=" << head_next << " tail_next=" << tail_next
+                  << " next_tag=" << next_tag << std::endl;
+        std::cerr << "  rob busy entries: ";
+        for (size_t i = 0; i < ROB_SIZE; i++) {
+            if (rob[i].busy) {
+                std::cerr << "[" << i << "].tag=" << rob[i].tag
+                          << " ready=" << rob[i].ready << " ";
+            }
+        }
+        std::cerr << std::endl;
     }
     
     assert(index != ROB_SIZE);

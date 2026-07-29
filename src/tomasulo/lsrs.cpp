@@ -148,7 +148,7 @@ std::array<CDBEntry, LSRS::LSRS_SIZE> LSRS::write_back() {
     std::array<CDBEntry, LSRS_SIZE> arr{};
     int index = 0;
     for (size_t i = 0; i < LSRS_SIZE; i++) {
-        if (next_lsrs[i].done && next_lsrs[i].is_load) {
+        if (!next_lsrs[i].busy || !next_lsrs[i].done || !next_lsrs[i].is_load) continue;
             LSRSEntry& entry = next_lsrs[i];
             arr[index] = {
                 true,
@@ -173,6 +173,7 @@ void LSRS::free_done_entries() {
     for (size_t i = 0; i < LSRS_SIZE; i++) {
         if (next_lsrs[i].done) {
             next_lsrs[i].busy = false;
+            next_lsrs[i].done = false;
         }
     }
 }
@@ -187,6 +188,7 @@ bool LSRS::is_full() const {
 void LSRS::flush_next() {
     for (size_t i = 0; i < LSRS_SIZE; i++) {
         next_lsrs[i].busy = false;
+        next_lsrs[i].done = false;
     }
 }
 

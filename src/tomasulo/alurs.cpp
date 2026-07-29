@@ -124,7 +124,7 @@ std::array<CDBEntry, ALURS::ALURS_SIZE> ALURS::write_back() {
     std::array<CDBEntry, ALURS_SIZE> arr{};
     int index = 0;
     for (size_t i = 0; i < ALURS_SIZE; i++) {
-        if (next_alurs[i].done) {
+        if (!next_alurs[i].busy || !next_alurs[i].done) continue;
             ALURSEntry& entry = next_alurs[i];
             arr[index] = {
                 true,
@@ -144,6 +144,7 @@ void ALURS::free_done_entries() {
     for (size_t i = 0; i < ALURS_SIZE; i++) {
         if (next_alurs[i].done) {
             next_alurs[i].busy = false;
+            next_alurs[i].done = false;
         }
     }
 }
@@ -158,6 +159,7 @@ bool ALURS::is_full() const {
 void ALURS::flush_next() {
     for (size_t i = 0; i < ALURS_SIZE; i++) {
         next_alurs[i].busy = false;
+        next_alurs[i].done = false;
     }
 }
 

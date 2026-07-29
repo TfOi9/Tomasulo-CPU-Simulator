@@ -47,9 +47,9 @@ public:
     
 private:
     // current alurs entries
-    std::array<ALURSEntry, ALURS_SIZE> alurs;
+    std::array<ALURSEntry, ALURS_SIZE> alurs{};
     // next state alurs entries
-    std::array<ALURSEntry, ALURS_SIZE> next_alurs;
+    std::array<ALURSEntry, ALURS_SIZE> next_alurs{};
 
 public:
     // allocate a rs entry, read source state from rat

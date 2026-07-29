@@ -49,9 +49,9 @@ public:
 
 private:
     // current lsrs entries
-    std::array<LSRSEntry, LSRS_SIZE> lsrs;
+    std::array<LSRSEntry, LSRS_SIZE> lsrs{};
     // next state lsrs entries
-    std::array<LSRSEntry, LSRS_SIZE> next_lsrs;
+    std::array<LSRSEntry, LSRS_SIZE> next_lsrs{};
     // helper: check if older store conflicts with load
     bool older_store_conflict(const LSRSEntry& load_entry);
 

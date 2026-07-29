@@ -22,9 +22,9 @@ struct StoreBuffer {
     // store buffer size
     constexpr static size_t SB_SIZE = 8;
     // current store buffer
-    std::array<SBEntry, SB_SIZE> sb;
+    std::array<SBEntry, SB_SIZE> sb{};
     // next state store buffer
-    std::array<SBEntry, SB_SIZE> next_sb;
+    std::array<SBEntry, SB_SIZE> next_sb{};
 
 public:
     // insert a store entry

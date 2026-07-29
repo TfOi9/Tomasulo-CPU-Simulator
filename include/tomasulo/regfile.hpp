@@ -10,9 +10,9 @@ class ArchRegFile {
     // file size
     constexpr static size_t FILE_SIZE = 32;
     // current state registers
-    std::array<uint32_t, FILE_SIZE> regs;
+    std::array<uint32_t, FILE_SIZE> regs{};
     // next state registers
-    std::array<uint32_t, FILE_SIZE> new_regs;
+    std::array<uint32_t, FILE_SIZE> new_regs{};
 
 public:
     // prepare next state as copy of current state

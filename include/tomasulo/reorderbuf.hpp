@@ -48,9 +48,9 @@ class ReorderBuf {
     // ROB size
     constexpr static size_t ROB_SIZE = 32;
     // the current rob
-    std::array<ROBEntry, ROB_SIZE> rob;
+    std::array<ROBEntry, ROB_SIZE> rob{};
     // the rob in the next cycle
-    std::array<ROBEntry, ROB_SIZE> next_rob;
+    std::array<ROBEntry, ROB_SIZE> next_rob{};
     // the head and tail ptr
     uint32_t head = 0, tail = 0;
     // the head and tail ptr of next
