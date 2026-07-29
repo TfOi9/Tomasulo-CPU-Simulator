@@ -73,6 +73,8 @@ public:
     bool is_full() const;
     // is the next queue full
     bool is_next_full() const;
+    // is the current queue empty
+    bool is_empty() const;
 
     // --- interface for WriteBack phase ---
     // write the result into ROB after executing

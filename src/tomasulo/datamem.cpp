@@ -7,7 +7,7 @@ void SimDataMemory::load_hex_data(const std::string &data) {
 }
 
 void SimDataMemory::issue_read_next(size_t addr, InstrType type) {
-    assert(rq.valid == false);
+    assert(!rq.valid && !next.valid);
 
     next = MemRq {
         true,
@@ -21,7 +21,7 @@ void SimDataMemory::issue_read_next(size_t addr, InstrType type) {
 }
 
 void SimDataMemory::issue_write_next(size_t addr, uint32_t val, InstrType type) {
-    assert(rq.valid == false);
+    assert(!rq.valid && !next.valid);
 
     next = MemRq {
         true,
@@ -83,7 +83,7 @@ void SimDataMemory::decrease_left_cycles() {
 }
 
 bool SimDataMemory::is_busy() const {
-    return rq.valid;
+    return rq.valid || next.valid;
 }
 
 bool SimDataMemory::read_ready() const {

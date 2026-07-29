@@ -26,6 +26,7 @@ int LSRS::alloc(const Instr &ins, const RegAliasTab &rat,
             uint32_t addr = 0;
             if (rj.ready) {
                 addr = rj.val + uint32_t(ins.imm);
+                addr_ready = true;
             }
 
             next_lsrs[i] = {
@@ -147,7 +148,7 @@ std::array<CDBEntry, LSRS::LSRS_SIZE> LSRS::write_back() {
     std::array<CDBEntry, LSRS_SIZE> arr{};
     int index = 0;
     for (size_t i = 0; i < LSRS_SIZE; i++) {
-        if (next_lsrs[i].done) {
+        if (next_lsrs[i].done && next_lsrs[i].is_load) {
             LSRSEntry& entry = next_lsrs[i];
             arr[index] = {
                 true,

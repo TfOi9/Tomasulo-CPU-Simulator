@@ -37,6 +37,10 @@ bool ReorderBuf::is_full() const {
     return head == tail && rob[head].busy == true;
 }
 
+bool ReorderBuf::is_empty() const {
+    return head == tail && !rob[head].busy;
+}
+
 bool ReorderBuf::is_next_full() const {
     return head_next == tail_next
         && next_rob[head_next].busy == true;

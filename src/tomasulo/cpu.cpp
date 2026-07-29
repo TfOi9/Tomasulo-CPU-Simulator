@@ -1,10 +1,5 @@
 #include "../../include/tomasulo/cpu.hpp"
 #include "../../include/tomasulo/branchpred.hpp"
-#include "decoder/instr.hpp"
-#include "tomasulo/alurs.hpp"
-#include "tomasulo/cdb.hpp"
-#include "tomasulo/lsrs.hpp"
-#include "tomasulo/reorderbuf.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -244,7 +239,7 @@ void TomasuloCPU::issue() {
         }
     }
 
-    fetch_valid = true;
+    fetch_valid = false;
 }
 
 void TomasuloCPU::fetch() {
@@ -272,7 +267,6 @@ void TomasuloCPU::finalize() {
 void TomasuloCPU::cycle() {
     // initialize
     init_next_states();
-    dmem.decrease_left_cycles();
 
     // pipeline, can change sequence or run in parallel
     cdb_listen();
@@ -299,7 +293,7 @@ void TomasuloCPU::cycle() {
 void TomasuloCPU::run(int max_cycles) {
     for (int i = 0; i < max_cycles; i++) {
         cycle();
-        if (halted) {
+        if (halted && !fetch_valid && rob.is_empty()) {
             break;
         }
     }

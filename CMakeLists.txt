@@ -33,6 +33,26 @@ add_library(tomasulo STATIC
     src/tomasulo/tracefile.cpp
 )
 
+add_executable(simulator
+    src/main.cpp
+    src/tomasulo/cpu.cpp
+    src/tomasulo/alurs.cpp
+    src/tomasulo/branchpred.cpp
+    src/tomasulo/datamem.cpp
+    src/tomasulo/lsrs.cpp
+    src/tomasulo/regaliastab.cpp
+    src/tomasulo/regfile.cpp
+    src/tomasulo/reorderbuf.cpp
+    src/tomasulo/storebuf.cpp
+    src/tomasulo/tracefile.cpp
+    src/mem/datamem.cpp
+    src/mem/instrmem.cpp
+    src/mem/simmem.cpp
+    src/ints.cpp
+    src/decoder/instr.cpp
+    src/alu/alucomp.cpp
+)
+
 set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "*.trace")
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/unit_tests/CMakeLists.txt")
