@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <cassert>
+#include <iostream>
 
 TomasuloCPU::TomasuloCPU(bool trace): tf(regf, trace) {
     bp = new NaivePredictor();
@@ -297,4 +298,10 @@ void TomasuloCPU::run(int max_cycles) {
             break;
         }
     }
+    if (!halted) {
+        std::cerr << "REACHING MAX STEPS\n";
+        return;
+    }
+    uint8_t ret = uint8_t(regf.read_reg(10) & 0xFF);
+    std::cout << int(ret) << std::endl;
 }
