@@ -13,6 +13,9 @@ public:
     // update status by give branch taken information
     virtual void update(uint32_t pc, bool actual_taken) = 0;
 
+    // virtual destructor
+    virtual ~BranchPredictor();
+
 };
 
 class NaivePredictor: public BranchPredictor {
