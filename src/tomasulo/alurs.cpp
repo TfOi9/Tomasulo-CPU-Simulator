@@ -140,6 +140,14 @@ std::array<CDBEntry, ALURS::ALURS_SIZE> ALURS::write_back() {
     return arr;
 }
 
+void ALURS::free_done_entries() {
+    for (size_t i = 0; i < ALURS_SIZE; i++) {
+        if (next_alurs[i].done) {
+            next_alurs[i].busy = false;
+        }
+    }
+}
+
 bool ALURS::is_full() const {
     for (size_t i = 0; i < ALURS_SIZE; i++) {
         if (!alurs[i].busy) return false;

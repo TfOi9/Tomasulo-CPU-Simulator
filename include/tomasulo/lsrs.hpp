@@ -63,6 +63,10 @@ public:
     void execute(StoreBuffer& sb, SimDataMemory& dmem);
     // write back done entries, returning cdb broadcast list
     std::array<CDBEntry, LSRS_SIZE> write_back();
+    // fetch an lsrs entry
+    const LSRSEntry& get_entry(size_t idx) const;
+    // free all done entries
+    void free_done_entries();
     // check if lsrs is full
     bool is_full() const;
     // flush all entries for restoring

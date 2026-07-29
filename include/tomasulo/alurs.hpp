@@ -59,6 +59,8 @@ public:
     void execute();
     // write back done entries, returning cdb broadcast list
     std::array<CDBEntry, ALURS_SIZE> write_back();
+    // free all done entries
+    void free_done_entries();
     // check if alurs is full
     bool is_full() const;
     // flush all entries for restoring

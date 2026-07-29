@@ -1,5 +1,7 @@
 #include "../../include/tomasulo/lsrs.hpp"
 
+#include <cassert>
+
 int LSRS::alloc(const Instr &ins, const RegAliasTab &rat,
         uint32_t rob_tag, uint32_t pc) {
     for (size_t i = 0; i < LSRS_SIZE; i++) {
@@ -159,6 +161,19 @@ std::array<CDBEntry, LSRS::LSRS_SIZE> LSRS::write_back() {
         }
     }
     return arr;
+}
+
+const LSRSEntry& LSRS::get_entry(size_t idx) const {
+    assert(idx < LSRS_SIZE);
+    return next_lsrs[idx];
+}
+
+void LSRS::free_done_entries() {
+    for (size_t i = 0; i < LSRS_SIZE; i++) {
+        if (next_lsrs[i].done) {
+            next_lsrs[i].busy = false;
+        }
+    }
 }
 
 bool LSRS::is_full() const {
