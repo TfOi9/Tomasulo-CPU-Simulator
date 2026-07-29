@@ -3,6 +3,7 @@ project(TomasuloCPUSimulator)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include_directories(${CMAKE_SOURCE_DIR})
 
@@ -17,6 +18,19 @@ add_executable(interpreter
     src/ints.cpp
     src/decoder/instr.cpp
     src/alu/alucomp.cpp
+)
+
+add_library(tomasulo STATIC
+    src/tomasulo/cpu.cpp
+    src/tomasulo/alurs.cpp
+    src/tomasulo/branchpred.cpp
+    src/tomasulo/datamem.cpp
+    src/tomasulo/lsrs.cpp
+    src/tomasulo/regaliastab.cpp
+    src/tomasulo/regfile.cpp
+    src/tomasulo/reorderbuf.cpp
+    src/tomasulo/storebuf.cpp
+    src/tomasulo/tracefile.cpp
 )
 
 set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "*.trace")

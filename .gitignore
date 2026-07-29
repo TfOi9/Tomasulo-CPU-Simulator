@@ -5,3 +5,5 @@ build/
 unit_tests/
 *.dSYM
 *.trace
+.clangd
+compile_commands.json

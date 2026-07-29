@@ -1,3 +1,9 @@
 CompileFlags:
-  Add: 
+  Add:
     - -std=c++17
+    - -I/Users/zhaoruicheng/Downloads/Tomasulo-CPU-Simulator/include
+    - -I/Users/zhaoruicheng/Downloads/Tomasulo-CPU-Simulator/src
+  CompilationDatabase: build
+
+Tweak:
+  Enable: false
