@@ -1,3 +1,4 @@
+#include <iostream>
 #include "../../include/decoder/instr.hpp"
 
 #include <cassert>
@@ -17,8 +18,8 @@ Instr Instr::decode(uint32_t raw) {
     uint8_t rd = (raw >> 7) & 0x1F;
     uint8_t rs1 = (raw >> 15) & 0x1F;
     uint8_t rs2 = (raw >> 20) & 0x1F;
-    int32_t imm;
-    InstrType type;
+    int32_t imm = 0;
+    InstrType type = InstrType::UNKNOWN;
 
     switch (opcode) {
         case 0b0110011: // R
@@ -244,7 +245,8 @@ Instr Instr::decode(uint32_t raw) {
             type = InstrType::LUI;
             break;
         default:
-            assert(false);
+            type = InstrType::UNKNOWN;
+            break;
     }
 
     int type_int = static_cast<int>(type);

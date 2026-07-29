@@ -6,12 +6,12 @@
 #include <string>
 
 uint8_t SimMemory::read_byte(size_t index) const {
-    assert(index >= 0 && index < MEM_SIZE);
+    if (index >= MEM_SIZE) return 0;
     return mem[index];
 }
 
 void SimMemory::write_byte(size_t index, uint8_t val) {
-    assert(index >= 0 && index < MEM_SIZE);
+    if (index >= MEM_SIZE) return;
     mem[index] = val;
 }
 

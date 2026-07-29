@@ -1,11 +1,11 @@
 #include "../../include/tomasulo/reorderbuf.hpp"
 
 #include <cassert>
-#include <iostream>
 
 int ReorderBuf::alloc(InstrType type, uint8_t dest_reg,
         uint32_t pc, bool is_branch, bool branch_pred_taken,
-        uint32_t branch_target, bool is_store) {
+        uint32_t branch_target, bool is_store,
+        uint32_t pred_target) {
     if (is_next_full()) {
         return -1;
     }
@@ -23,6 +23,7 @@ int ReorderBuf::alloc(InstrType type, uint8_t dest_reg,
         branch_pred_taken,
         false,
         branch_target,
+        pred_target,
         is_store,
         0,
         0,
@@ -54,21 +55,6 @@ void ReorderBuf::write_result(uint32_t tag, uint32_t val) {
             index = i;
             break;
         }
-    }
-    
-    if (index == ROB_SIZE) {
-        std::cerr << "[write_result] tag=" << tag << " val=" << val
-                  << " NOT FOUND in rob. head=" << head << " tail=" << tail
-                  << " head_next=" << head_next << " tail_next=" << tail_next
-                  << " next_tag=" << next_tag << std::endl;
-        std::cerr << "  rob busy entries: ";
-        for (size_t i = 0; i < ROB_SIZE; i++) {
-            if (rob[i].busy) {
-                std::cerr << "[" << i << "].tag=" << rob[i].tag
-                          << " ready=" << rob[i].ready << " ";
-            }
-        }
-        std::cerr << std::endl;
     }
     
     assert(index != ROB_SIZE);
@@ -134,11 +120,9 @@ bool ReorderBuf::commit() {
 
     // handle branch mispredict
     if (entry.is_branch) {
-        if (entry.branch_actual_taken != entry.branch_pred_taken) {
-            // flush all entries after this branch
+        if (entry.branch_actual_taken != entry.branch_pred_taken ||
+            entry.branch_target != entry.pred_target) {
             flush_from_next(entry.tag);
-            // redirect pc to this instruction's correct target
-            // TODO
             mispredict = true;
         }
     }

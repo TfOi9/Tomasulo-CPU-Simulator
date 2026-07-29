@@ -31,7 +31,6 @@ void RegAliasTab::commit_clear_next(uint8_t reg, uint32_t rob_tag, uint32_t val)
 }
 
 void RegAliasTab::restore_from_next(uint32_t flush_tag, const ArchRegFile &arch) {
-    compute_next();
     for (size_t i = 0; i < RAT_SIZE; i++) {
         if (next_rat[i].tag > flush_tag) {
             next_rat[i] = {true, arch.read_reg(i), 0};

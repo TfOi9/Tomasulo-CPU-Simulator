@@ -39,8 +39,13 @@ class TomasuloCPU {
     uint32_t next_pc;
     uint32_t fetched_pc;
 
+    uint32_t ras[16];
+    int ras_top;
+    uint32_t ras_predicted_target;
+
     Instr fetched_instr;
     bool fetch_valid;
+    bool redirect;
     bool halted;
 
     uint32_t cycle_count;

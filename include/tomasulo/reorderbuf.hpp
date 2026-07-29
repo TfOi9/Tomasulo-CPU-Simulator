@@ -32,6 +32,9 @@ struct ROBEntry {
     // the correct target address
     uint32_t branch_target;
 
+    // predicted target address (for mispredict detection)
+    uint32_t pred_target;
+
     // is the instruction a store
     bool is_store;
     // the storing address
@@ -68,7 +71,8 @@ public:
     // returns tag( = tail) if success, else -1
     int alloc(InstrType type, uint8_t dest_reg, uint32_t pc,
         bool is_branch, bool branch_pred_taken,
-        uint32_t branch_target, bool is_store);
+        uint32_t branch_target, bool is_store,
+        uint32_t pred_target = 0);
     // is the current queue full
     bool is_full() const;
     // is the next queue full
@@ -103,5 +107,8 @@ public:
     void compute_next();
     // flip curr and next
     void update();
+
+    uint32_t _head() const { return head; }
+    uint32_t _tail() const { return tail; }
 
 };

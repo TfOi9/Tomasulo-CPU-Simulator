@@ -8,6 +8,8 @@
 
 TomasuloCPU::TomasuloCPU(bool trace): tf(regf, trace) {
     bp = new NaivePredictor();
+    redirect = false;
+    ras_top = 0;
 }
 
 TomasuloCPU::~TomasuloCPU() {
@@ -149,6 +151,8 @@ void TomasuloCPU::commit() {
             sb.commit_next(tag);
         }
 
+        tf.dump(entry_pc);
+
         if (mis) {
             mispredicted_branches++;
 
@@ -159,6 +163,8 @@ void TomasuloCPU::commit() {
 
             next_pc = actual_taken ? br_target : (entry_pc + 4);
             fetch_valid = false;
+            redirect = true;
+            halted = false;
             break;
         }
 
@@ -173,6 +179,7 @@ void TomasuloCPU::issue() {
 
     if (ins.header.type == InstrType::HALT) {
         halted = true;
+        fetch_valid = false;
         return;
     }
 
@@ -209,9 +216,17 @@ void TomasuloCPU::issue() {
     bool pred_taken = false;
     uint32_t pred_target = fetched_pc + 4;
     if (is_branch) {
-        auto [taken, target] = bp->predict(fetched_pc, ins.imm);
-        pred_taken = taken;
-        pred_target = target;
+        if (type == InstrType::JAL) {
+            pred_taken = true;
+            pred_target = fetched_pc + ins.imm;
+        } else if (type == InstrType::JALR) {
+            pred_taken = true;
+            pred_target = ras_predicted_target;
+        } else {
+            auto [taken, target] = bp->predict(fetched_pc, ins.imm);
+            pred_taken = taken;
+            pred_target = target;
+        }
     }
 
     uint8_t dest_reg = ins.rd;
@@ -222,7 +237,8 @@ void TomasuloCPU::issue() {
         is_branch,
         pred_taken,
         is_branch ? (fetched_pc + ins.imm) : 0,
-        is_store
+        is_store,
+        is_branch ? pred_target : 0
     );
 
     if (rob_tag < 0) return;
@@ -244,6 +260,10 @@ void TomasuloCPU::issue() {
 }
 
 void TomasuloCPU::fetch() {
+    if (redirect) {
+        redirect = false;
+        return;
+    }
     if (fetch_valid || halted) return;
     uint32_t raw = imem.read_instr(pc);
     fetched_instr = Instr::decode(raw);
@@ -254,8 +274,21 @@ void TomasuloCPU::fetch() {
     bool is_branch = (fetched_instr.header.place == InstrPlace::BRANCH);
 
     if (is_branch) {
-        auto [taken, target] = bp->predict(pc, fetched_instr.imm);
-        next_pc = target;
+        if (type == InstrType::JAL) {
+            next_pc = pc + uint32_t(fetched_instr.imm);
+            if (fetched_instr.rd != 0 && ras_top < 16) ras[ras_top++] = pc + 4;
+        } else if (type == InstrType::JALR) {
+            if (ras_top > 0) {
+                ras_predicted_target = ras[--ras_top];
+                next_pc = ras_predicted_target;
+            } else {
+                fetch_valid = false;
+                return;
+            }
+        } else {
+            auto [taken, target] = bp->predict(pc, fetched_instr.imm);
+            next_pc = target;
+        }
     } else {
         next_pc = pc + 4;
     }
@@ -269,11 +302,11 @@ void TomasuloCPU::cycle() {
     // initialize
     init_next_states();
 
-    // pipeline, can change sequence or run in parallel
+    // pipeline
     cdb_listen();
     writeback();
-    execute();
     commit();
+    execute();
     issue();
     fetch();
     finalize();
@@ -295,11 +328,12 @@ void TomasuloCPU::run(int max_cycles) {
     for (int i = 0; i < max_cycles; i++) {
         cycle();
         if (halted && !fetch_valid && rob.is_empty()) {
+            std::cerr << "HALTED at cycle=" << i << " a0=" << regf.read_reg(10) << std::endl;
             break;
         }
     }
     if (!halted) {
-        std::cerr << "REACHING MAX STEPS\n";
+        std::cerr << "REACHING MAX STEPS halted=" << halted << " fetch_valid=" << fetch_valid << " rob_empty=" << rob.is_empty() << " pc=0x" << std::hex << pc << std::dec << std::endl;
         return;
     }
     uint8_t ret = uint8_t(regf.read_reg(10) & 0xFF);

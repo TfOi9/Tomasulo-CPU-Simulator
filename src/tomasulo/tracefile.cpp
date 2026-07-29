@@ -13,7 +13,7 @@ std::string get_time() {
 
 TraceFile::TraceFile(const ArchRegFile& regf, bool trace_enabled): regf(regf), trace_enabled(trace_enabled) {
     if (trace_enabled) {
-        file.open("tr-" + get_time() + ".trace", std::ios::trunc);
+        file.open("tr-sim-" + get_time() + ".trace", std::ios::trunc);
         if (!file) {
             assert(false);
         }

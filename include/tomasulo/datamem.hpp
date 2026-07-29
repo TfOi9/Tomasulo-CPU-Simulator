@@ -32,9 +32,9 @@ class SimDataMemory {
     // the simulated memory
     DataMemory mem;
     // the current request
-    MemRq rq;
+    MemRq rq{};
     // the request in the next cycle
-    MemRq next;
+    MemRq next{};
 
 public:
     // load hexdecimal memory data
