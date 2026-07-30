@@ -9,12 +9,18 @@
 TomasuloCPU::TomasuloCPU(bool trace)
     : cdb{false, 0, 0, false, false, 0},
       next_cdb{false, 0, 0, false, false, 0},
-      bp(new BimodalPredictor()),
+      bp(new GsharePredictor()),
       tf(regf, trace),
       pc(0),
       next_pc(0),
       fetched_pc(0),
       next_fetched_pc(0),
+      fetched_pred_taken(false),
+      next_fetched_pred_taken(false),
+      fetched_pred_target(0),
+      next_fetched_pred_target(0),
+      fetched_pred_context(0),
+      next_fetched_pred_context(0),
       ras{},
       ras_top(0),
       ras_predicted_target(0),
@@ -54,6 +60,12 @@ void TomasuloCPU::load_program(const std::string &path) {
     next_pc = 0;
     fetched_pc = 0;
     next_fetched_pc = 0;
+    fetched_pred_taken = false;
+    next_fetched_pred_taken = false;
+    fetched_pred_target = 0;
+    next_fetched_pred_target = 0;
+    fetched_pred_context = 0;
+    next_fetched_pred_context = 0;
     cdb = {false, 0, 0, false, false, 0};
     next_cdb = {false, 0, 0, false, false, 0};
     fetch_valid = false;
@@ -73,6 +85,9 @@ void TomasuloCPU::load_program(const std::string &path) {
 void TomasuloCPU::init_next_states() {
     next_pc = pc;
     next_fetched_pc = fetched_pc;
+    next_fetched_pred_taken = fetched_pred_taken;
+    next_fetched_pred_target = fetched_pred_target;
+    next_fetched_pred_context = fetched_pred_context;
     next_fetched_instr = fetched_instr;
     next_fetch_valid = fetch_valid;
     next_redirect = redirect;
@@ -140,9 +155,6 @@ void TomasuloCPU::writeback() {
 
         rob.write_store_result(e.rob_tag, e.addr, e.vk);
     }
-    // A single CDB can broadcast only one result per clock.  Keep every
-    // unselected producer in its RS so it remains eligible next cycle;
-    // dropping it here loses wakeups for already-issued dependants.
     if (ls_cdb.valid) {
         next_cdb = ls_cdb;
         lsrs.free_entry_by_tag(ls_cdb.rob_tag);
@@ -181,6 +193,7 @@ void TomasuloCPU::commit() {
         bool actual_taken = entry.branch_actual_taken;
         uint32_t br_target = entry.branch_target;
         bool pred_taken = entry.branch_pred_taken;
+        uint32_t pred_context = entry.branch_pred_context;
 
         // write data memory
         if (is_store) {
@@ -200,7 +213,10 @@ void TomasuloCPU::commit() {
         // update branch predictor
         if (is_branch) {
             total_branches++;
-            bp->update(entry_pc, actual_taken);
+            if (entry.type != InstrType::JAL &&
+                entry.type != InstrType::JALR) {
+                bp->update(entry_pc, pred_context, actual_taken);
+            }
         }
 
         // ROB commit
@@ -235,9 +251,6 @@ void TomasuloCPU::issue() {
         return;
     }
 
-    // A decoded RV32I instruction always carries 5-bit register indices.
-    // Treat malformed speculative instruction bytes as a frontend bubble
-    // instead of allowing them to corrupt the RAT/ROB state.
     if (ins.rd >= 32 || ins.rs1 >= 32 || ins.rs2 >= 32) {
         next_fetch_valid = false;
         return;
@@ -283,9 +296,8 @@ void TomasuloCPU::issue() {
             pred_taken = true;
             pred_target = ras_predicted_target;
         } else {
-            auto [taken, target] = bp->predict(fetched_pc, ins.imm);
-            pred_taken = taken;
-            pred_target = target;
+            pred_taken = fetched_pred_taken;
+            pred_target = fetched_pred_target;
         }
     }
 
@@ -298,7 +310,8 @@ void TomasuloCPU::issue() {
         pred_taken,
         is_branch ? (fetched_pc + ins.imm) : 0,
         is_store,
-        is_branch ? pred_target : 0
+        is_branch ? pred_target : 0,
+        is_branch ? fetched_pred_context : 0
     );
 
     if (rob_tag < 0) return;
@@ -307,8 +320,6 @@ void TomasuloCPU::issue() {
         rat.set_tag_next(dest_reg, rob_tag);
     }
 
-    // The issue phase reads only current state.  A result already resident in
-    // the current ROB can be forwarded even if its one-cycle CDB pulse passed.
     auto resolve_operand = [this](uint8_t reg) {
         RATEntry operand = rat.read(reg);
         uint32_t value = 0;
@@ -343,6 +354,9 @@ void TomasuloCPU::fetch() {
     next_fetched_instr = Instr::decode(raw);
     next_fetched_pc = pc;
     next_fetch_valid = true;
+    next_fetched_pred_taken = false;
+    next_fetched_pred_target = pc + 4;
+    next_fetched_pred_context = 0;
 
     InstrType type = next_fetched_instr.header.type;
     bool is_branch = (next_fetched_instr.header.place == InstrPlace::BRANCH);
@@ -351,15 +365,15 @@ void TomasuloCPU::fetch() {
         if (type == InstrType::JAL) {
             next_pc = pc + uint32_t(next_fetched_instr.imm);
         } else if (type == InstrType::JALR) {
-            // A speculative RAS must itself be checkpointed and restored on
-            // every branch flush.  Until that state is modeled, use the
-            // deterministic fall-through prediction for indirect jumps;
-            // execute supplies the authoritative target at commit.
             ras_predicted_target = pc + 4;
             next_pc = pc + 4;
         } else {
-            auto [taken, target] = bp->predict(pc, next_fetched_instr.imm);
-            next_pc = target;
+            BranchPrediction prediction =
+                bp->predict(pc, next_fetched_instr.imm);
+            next_fetched_pred_taken = prediction.taken;
+            next_fetched_pred_target = prediction.target;
+            next_fetched_pred_context = prediction.context;
+            next_pc = prediction.target;
         }
     } else {
         next_pc = pc + 4;
@@ -373,14 +387,12 @@ void TomasuloCPU::finalize() {
 void TomasuloCPU::resolve_cycle_outputs() {
     if (!squash_pending) return;
 
-    // A branch recovery has priority over every younger phase output.  This
-    // merge runs after all phases, so it has the same result regardless of
-    // whether issue/fetch happened before or after commit in the C++ source.
     rob.flush_from_next(squash_tag);
     alurs.flush_next();
     lsrs.flush_next();
     sb.flush_from_next(squash_tag);
     rat.restore_from_next(squash_tag, regf);
+    bp->recover();
     if (next_cdb.valid && next_cdb.rob_tag > squash_tag) {
         next_cdb = {false, 0, 0, false, false, 0};
     }
@@ -420,6 +432,9 @@ void TomasuloCPU::cycle() {
     bp->clock();
     pc = next_pc;
     fetched_pc = next_fetched_pc;
+    fetched_pred_taken = next_fetched_pred_taken;
+    fetched_pred_target = next_fetched_pred_target;
+    fetched_pred_context = next_fetched_pred_context;
     fetched_instr = next_fetched_instr;
     fetch_valid = next_fetch_valid;
     redirect = next_redirect;

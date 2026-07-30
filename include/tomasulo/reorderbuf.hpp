@@ -34,6 +34,8 @@ struct ROBEntry {
 
     // predicted target address (for mispredict detection)
     uint32_t pred_target;
+    // opaque predictor state captured when this branch was fetched
+    uint32_t branch_pred_context;
 
     // is the instruction a store
     bool is_store;
@@ -72,7 +74,7 @@ public:
     int alloc(InstrType type, uint8_t dest_reg, uint32_t pc,
         bool is_branch, bool branch_pred_taken,
         uint32_t branch_target, bool is_store,
-        uint32_t pred_target = 0);
+        uint32_t pred_target = 0, uint32_t branch_pred_context = 0);
     // is the current queue full
     bool is_full() const;
     // is the next queue full

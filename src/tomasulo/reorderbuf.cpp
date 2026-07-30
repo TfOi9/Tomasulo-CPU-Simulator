@@ -5,7 +5,7 @@
 int ReorderBuf::alloc(InstrType type, uint8_t dest_reg,
         uint32_t pc, bool is_branch, bool branch_pred_taken,
         uint32_t branch_target, bool is_store,
-        uint32_t pred_target) {
+        uint32_t pred_target, uint32_t branch_pred_context) {
     if (is_full()) {
         return -1;
     }
@@ -24,6 +24,7 @@ int ReorderBuf::alloc(InstrType type, uint8_t dest_reg,
         false,
         branch_target,
         pred_target,
+        branch_pred_context,
         is_store,
         0,
         0,
