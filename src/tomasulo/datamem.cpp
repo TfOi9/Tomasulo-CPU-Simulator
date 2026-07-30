@@ -16,7 +16,7 @@ void SimDataMemory::issue_read_next(size_t addr, InstrType type,
         type,
         addr,
         0,
-        3,
+        dmem_delay,
         rob_tag
     };
 }

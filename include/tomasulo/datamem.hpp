@@ -41,6 +41,9 @@ class SimDataMemory {
     MemRq pending_load{};
     MemRq pending_store{};
 
+    // dmem delay cycle count
+    constexpr static uint32_t dmem_delay = 3;
+
 public:
     // load hexdecimal memory data
     void load_hex_data(const std::string& data);
