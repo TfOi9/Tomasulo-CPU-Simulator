@@ -443,3 +443,16 @@ void TomasuloCPU::run(int max_cycles) {
     uint8_t ret = uint8_t(regf.read_reg(10) & 0xFF);
     std::cout << int(ret) << std::endl;
 }
+
+void TomasuloCPU::report() {
+    if (!halted) {
+        std::cerr << "Tomasulo CPU reached simulation cycle limit.\n";
+    } else {
+        std::cerr << "Tomasulo CPU halted.\n";
+    }
+
+    std::cerr << "CPU cycles: " << cycle_count << std::endl;
+    std::cerr << "Branch count: " << total_branches << std::endl;
+    std::cerr << "Mispredicted branches: " << mispredicted_branches << std::endl;
+    std::cerr << "Branch predict success rate: " << double(total_branches - mispredicted_branches) / double(total_branches) << std::endl;
+}

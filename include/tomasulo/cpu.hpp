@@ -91,5 +91,7 @@ public:
     void cycle();
     // run until halt or reached limits
     void run(int max_cycles = 250000000);
+    // report run data
+    void report();
 
 };
