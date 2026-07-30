@@ -54,7 +54,7 @@ add_executable(code
 )
 
 if(NOT MSVC)
-    target_compile_options(simulator PRIVATE -O3)
+    target_compile_options(code PRIVATE -O3)
 endif()
 
 set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "*.trace")
