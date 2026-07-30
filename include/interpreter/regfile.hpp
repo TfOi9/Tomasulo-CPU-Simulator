@@ -2,6 +2,7 @@
 
 #include <array>
 #include <string>
+#include <cstdint>
 
 // Register File for the interpreter
 class RegFile {
