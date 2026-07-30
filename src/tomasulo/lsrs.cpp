@@ -1,5 +1,4 @@
 #include "../../include/tomasulo/lsrs.hpp"
-#include "../../include/tomasulo/reorderbuf.hpp"
 
 #include <cassert>
 
@@ -72,45 +71,29 @@ int LSRS::alloc_resolved(const Instr &ins, const RATEntry &rj,
     return -1;
 }
 
-void LSRS::listen_cdb(uint32_t cdb_tag, uint32_t cdb_val) {
+void LSRS::listen_cdb(const CDBEntry& cdb) {
+    if (!cdb.valid) return;
+
     for (size_t i = 0; i < LSRS_SIZE; i++) {
         if (!lsrs[i].busy) {
             continue;
         }
-        if (lsrs[i].qj == cdb_tag) {
+        if (lsrs[i].qj == cdb.rob_tag) {
             next_lsrs[i].vj_ready = true;
-            next_lsrs[i].vj = cdb_val;
+            next_lsrs[i].vj = cdb.val;
             next_lsrs[i].qj = 0;
         }
-        if (lsrs[i].qk == cdb_tag) {
+        if (lsrs[i].qk == cdb.rob_tag) {
             next_lsrs[i].vk_ready = true;
-            next_lsrs[i].vk = cdb_val;
+            next_lsrs[i].vk = cdb.val;
             next_lsrs[i].qk = 0;
         }
     }
 }
 
-void LSRS::resolve_from_rob(const ReorderBuf& rob) {
-    for (size_t i = 0; i < LSRS_SIZE; ++i) {
-        const LSRSEntry& entry = lsrs[i];
-        LSRSEntry& next = next_lsrs[i];
-        if (!entry.busy) continue;
-        uint32_t value = 0;
-        if (entry.qj != 0 && rob.get_result_if_ready(entry.qj, value)) {
-            next.vj_ready = true;
-            next.vj = value;
-            next.qj = 0;
-        }
-        if (entry.qk != 0 && rob.get_result_if_ready(entry.qk, value)) {
-            next.vk_ready = true;
-            next.vk = value;
-            next.qk = 0;
-        }
-    }
-}
-
 void LSRS::execute(StoreBuffer &sb, SimDataMemory &dmem) {
-    if (dmem.read_ready()) {
+    bool response_consumed = dmem.read_ready();
+    if (response_consumed) {
         uint32_t owner = dmem.read_rob_tag();
         for (size_t i = 0; i < LSRS_SIZE; ++i) {
             const LSRSEntry& entry = lsrs[i];
@@ -122,9 +105,13 @@ void LSRS::execute(StoreBuffer &sb, SimDataMemory &dmem) {
                 break;
             }
         }
-        // Also discard a response whose owner was squashed.
         dmem.consume_read_next();
     }
+
+    size_t forwarded_load = LSRS_SIZE;
+    uint32_t forwarded_value = 0;
+    size_t memory_load = LSRS_SIZE;
+    uint32_t memory_addr = 0;
 
     for (size_t i = 0; i < LSRS_SIZE; i++) {
         const LSRSEntry& current = lsrs[i];
@@ -174,20 +161,46 @@ void LSRS::execute(StoreBuffer &sb, SimDataMemory &dmem) {
         
         uint32_t fwd_val = 0;
         if (sb.try_forward(entry.addr, entry.rob_tag, fwd_val)) {
-            entry.mem_result = load_value(entry.type, fwd_val);
-            if (next_lsrs[i].busy &&
-                next_lsrs[i].rob_tag == current.rob_tag) {
-                next_lsrs[i].mem_result = entry.mem_result;
-                next_lsrs[i].done = true;
+            if (!response_consumed &&
+                (forwarded_load == LSRS_SIZE ||
+                 entry.rob_tag < lsrs[forwarded_load].rob_tag)) {
+                forwarded_load = i;
+                forwarded_value = load_value(entry.type, fwd_val);
             }
             continue;
         }
         if (sb.must_stall_for_load(entry.addr, entry.rob_tag)) continue;
 
-        if (!dmem.is_busy()) {
-            dmem.issue_read_next(entry.addr, entry.type, entry.rob_tag);
+        if (!dmem.is_busy() &&
+            (memory_load == LSRS_SIZE ||
+             entry.rob_tag < lsrs[memory_load].rob_tag)) {
+            memory_load = i;
+            memory_addr = entry.addr;
         }
     }
+
+    if (forwarded_load != LSRS_SIZE) {
+        const LSRSEntry& entry = lsrs[forwarded_load];
+        if (next_lsrs[forwarded_load].busy &&
+            next_lsrs[forwarded_load].rob_tag == entry.rob_tag) {
+            next_lsrs[forwarded_load].mem_result = forwarded_value;
+            next_lsrs[forwarded_load].done = true;
+        }
+    }
+
+    if (memory_load != LSRS_SIZE) {
+        const LSRSEntry& entry = lsrs[memory_load];
+        dmem.issue_read_next(memory_addr, entry.type, entry.rob_tag);
+    }
+
+    size_t new_load_completions = 0;
+    for (size_t i = 0; i < LSRS_SIZE; i++) {
+        if (lsrs[i].busy && lsrs[i].is_load && !lsrs[i].done &&
+            next_lsrs[i].done) {
+            new_load_completions++;
+        }
+    }
+    assert(new_load_completions <= 1);
 }
 
 void LSRS::mark_mem_requested(uint32_t rob_tag) {
@@ -216,37 +229,23 @@ bool LSRS::older_store_conflict(const LSRSEntry& load_entry) {
     return false;
 }
 
-std::array<CDBEntry, LSRS::LSRS_SIZE> LSRS::write_back() {
-    std::array<CDBEntry, LSRS_SIZE> arr{};
-    int index = 0;
+CDBEntry LSRS::writeback_candidate() const {
+    const LSRSEntry* oldest = nullptr;
     for (size_t i = 0; i < LSRS_SIZE; i++) {
-        if (!lsrs[i].busy || !lsrs[i].done || !lsrs[i].is_load) continue;
         const LSRSEntry& entry = lsrs[i];
-        arr[index] = {
-            true,
-            entry.rob_tag,
-            entry.mem_result,
-            false,
-            false,
-            0
-        };
-        index++;
+        if (!entry.busy || !entry.done || !entry.is_load) continue;
+        if (oldest == nullptr || entry.rob_tag < oldest->rob_tag) {
+            oldest = &entry;
+        }
     }
-    return arr;
+
+    if (oldest == nullptr) return {};
+    return {true, oldest->rob_tag, oldest->mem_result, false, false, 0};
 }
 
 const LSRSEntry& LSRS::get_entry(size_t idx) const {
     assert(idx < LSRS_SIZE);
     return lsrs[idx];
-}
-
-void LSRS::free_done_entries() {
-    for (size_t i = 0; i < LSRS_SIZE; i++) {
-        if (next_lsrs[i].done) {
-            next_lsrs[i].busy = false;
-            next_lsrs[i].done = false;
-        }
-    }
 }
 
 void LSRS::free_entry_by_tag(uint32_t rob_tag) {

@@ -8,4 +8,4 @@ unit_tests/
 .clangd
 compile_commands.json
 .vscode
-run_tests.sh
+*.sh

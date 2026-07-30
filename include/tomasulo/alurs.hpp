@@ -7,8 +7,6 @@
 #include <cstdint>
 #include <array>
 
-class ReorderBuf;
-
 // ALU Reservation Station Entry
 struct ALURSEntry {
     // is the rs busy
@@ -61,15 +59,11 @@ public:
     int alloc_resolved(const Instr& ins, const RATEntry& rj,
         const RATEntry& rk, uint32_t rob_tag, uint32_t pc);
     // listen to the cdb broadcast, catch if match
-    void listen_cdb(uint32_t cdb_tag, uint32_t cdb_val);
-    // ROB forwarding is a safety net for an RS allocated after a CDB pulse.
-    void resolve_from_rob(const ReorderBuf& rob);
+    void listen_cdb(const CDBEntry& cdb);
     // execute entries that are ready
     void execute();
-    // write back done entries, returning cdb broadcast list
-    std::array<CDBEntry, ALURS_SIZE> write_back();
-    // free all done entries
-    void free_done_entries();
+    // return the oldest completed entry
+    CDBEntry writeback_candidate() const;
     void free_entry_by_tag(uint32_t rob_tag);
     // check if alurs is full
     bool is_full() const;

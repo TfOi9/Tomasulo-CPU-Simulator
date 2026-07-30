@@ -28,8 +28,7 @@ class TomasuloCPU {
     LSRS lsrs;
     StoreBuffer sb;
 
-    CDBEntry cdb;
-    CDBEntry next_cdb;
+    CDB cdb;
 
     BranchPredictor *bp;
 

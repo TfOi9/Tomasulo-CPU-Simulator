@@ -1,6 +1,5 @@
 #include "../../include/tomasulo/alurs.hpp"
 #include "../../include/alu/alucomp.hpp"
-#include "../../include/tomasulo/reorderbuf.hpp"
 
 #include <cassert>
 
@@ -40,50 +39,42 @@ int ALURS::alloc_resolved(const Instr &ins, const RATEntry &rj,
     return -1;
 }
 
-void ALURS::listen_cdb(uint32_t cdb_tag, uint32_t cdb_val) {
+void ALURS::listen_cdb(const CDBEntry& cdb) {
+    if (!cdb.valid) return;
+
     for (size_t i = 0; i < ALURS_SIZE; i++) {
         if (!alurs[i].busy) {
             continue;
         }
-        if (alurs[i].qj == cdb_tag) {
+        if (alurs[i].qj == cdb.rob_tag) {
             next_alurs[i].vj_ready = true;
-            next_alurs[i].vj = cdb_val;
+            next_alurs[i].vj = cdb.val;
             next_alurs[i].qj = 0;
         }
-        if (alurs[i].qk == cdb_tag) {
+        if (alurs[i].qk == cdb.rob_tag) {
             next_alurs[i].vk_ready = true;
-            next_alurs[i].vk = cdb_val;
+            next_alurs[i].vk = cdb.val;
             next_alurs[i].qk = 0;
         }
     }
 }
 
-void ALURS::resolve_from_rob(const ReorderBuf& rob) {
-    for (size_t i = 0; i < ALURS_SIZE; ++i) {
-        const ALURSEntry& entry = alurs[i];
-        ALURSEntry& next = next_alurs[i];
-        if (!entry.busy) continue;
-        uint32_t value = 0;
-        if (entry.qj != 0 && rob.get_result_if_ready(entry.qj, value)) {
-            next.vj_ready = true;
-            next.vj = value;
-            next.qj = 0;
-        }
-        if (entry.qk != 0 && rob.get_result_if_ready(entry.qk, value)) {
-            next.vk_ready = true;
-            next.vk = value;
-            next.qk = 0;
-        }
-    }
-}
-
 void ALURS::execute() {
+    size_t selected = ALURS_SIZE;
     for (size_t i = 0; i < ALURS_SIZE; i++) {
         const ALURSEntry& current = alurs[i];
         if (!current.busy || current.done) continue;
         if (current.qj || current.qk) continue;
+        if (selected == ALURS_SIZE ||
+            current.rob_tag < alurs[selected].rob_tag) {
+            selected = i;
+        }
+    }
 
+    if (selected != ALURS_SIZE) {
+        const ALURSEntry& current = alurs[selected];
         ALURSEntry entry = current;
+
         if (entry.is_branch) {
             switch (entry.type) {
                 case InstrType::BEQ:
@@ -141,38 +132,40 @@ void ALURS::execute() {
             }
         }
         entry.done = true;
-        if (next_alurs[i].busy && next_alurs[i].rob_tag == current.rob_tag) {
-            next_alurs[i] = entry;
+        if (next_alurs[selected].busy &&
+            next_alurs[selected].rob_tag == current.rob_tag) {
+            next_alurs[selected] = entry;
         }
     }
+
+    size_t new_completions = 0;
+    for (size_t i = 0; i < ALURS_SIZE; i++) {
+        if (alurs[i].busy && !alurs[i].done && next_alurs[i].done) {
+            new_completions++;
+        }
+    }
+    assert(new_completions <= 1);
 }
 
-std::array<CDBEntry, ALURS::ALURS_SIZE> ALURS::write_back() {
-    std::array<CDBEntry, ALURS_SIZE> arr{};
-    int index = 0;
+CDBEntry ALURS::writeback_candidate() const {
+    const ALURSEntry* oldest = nullptr;
     for (size_t i = 0; i < ALURS_SIZE; i++) {
-        if (!alurs[i].busy || !alurs[i].done) continue;
         const ALURSEntry& entry = alurs[i];
-        arr[index] = {
-            true,
-            entry.rob_tag,
-            entry.result,
-            entry.is_branch,
-            entry.branch_actual_taken,
-            entry.branch_target
-        };
-        index++;
-    }
-    return arr;
-}
-
-void ALURS::free_done_entries() {
-    for (size_t i = 0; i < ALURS_SIZE; i++) {
-        if (next_alurs[i].done) {
-            next_alurs[i].busy = false;
-            next_alurs[i].done = false;
+        if (!entry.busy || !entry.done) continue;
+        if (oldest == nullptr || entry.rob_tag < oldest->rob_tag) {
+            oldest = &entry;
         }
     }
+
+    if (oldest == nullptr) return {};
+    return {
+        true,
+        oldest->rob_tag,
+        oldest->result,
+        oldest->is_branch,
+        oldest->branch_actual_taken,
+        oldest->branch_target
+    };
 }
 
 void ALURS::free_entry_by_tag(uint32_t rob_tag) {

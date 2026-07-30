@@ -7,9 +7,7 @@
 #include <iostream>
 
 TomasuloCPU::TomasuloCPU(bool trace)
-    : cdb{false, 0, 0, false, false, 0},
-      next_cdb{false, 0, 0, false, false, 0},
-      bp(new GsharePredictor()),
+    : bp(new GsharePredictor()),
       tf(regf, trace),
       pc(0),
       next_pc(0),
@@ -66,8 +64,7 @@ void TomasuloCPU::load_program(const std::string &path) {
     next_fetched_pred_target = 0;
     fetched_pred_context = 0;
     next_fetched_pred_context = 0;
-    cdb = {false, 0, 0, false, false, 0};
-    next_cdb = {false, 0, 0, false, false, 0};
+    cdb.clear();
     fetch_valid = false;
     next_fetch_valid = false;
     redirect = false;
@@ -106,66 +103,44 @@ void TomasuloCPU::init_next_states() {
 }
 
 void TomasuloCPU::cdb_listen() {
-    if (cdb.valid) {
-        alurs.listen_cdb(cdb.rob_tag, cdb.val);
-        lsrs.listen_cdb(cdb.rob_tag, cdb.val);
-    }
-    alurs.resolve_from_rob(rob);
-    lsrs.resolve_from_rob(rob);
+    alurs.listen_cdb(cdb.inspect());
+    lsrs.listen_cdb(cdb.inspect());
 }
 
 void TomasuloCPU::writeback() {
-    CDBEntry alu_cdb = {false, 0, 0, false, false, 0};
-    CDBEntry ls_cdb = {false, 0, 0, false, false, 0};
+    cdb.clear();
 
-    // write back ALURS
-    auto alu_cdbs = alurs.write_back();
-    for (size_t i = 0; i < ALURS::ALURS_SIZE; i++) {
-        const CDBEntry& entry = alu_cdbs[i];
-        if (!entry.valid) continue;
+    CDBEntry alu_candidate = alurs.writeback_candidate();
+    CDBEntry load_candidate = lsrs.writeback_candidate();
+    bool alu_wins = alu_candidate.valid &&
+        (!load_candidate.valid ||
+         alu_candidate.rob_tag < load_candidate.rob_tag);
+    CDBEntry winner = alu_wins ? alu_candidate : load_candidate;
 
-        rob.write_result(entry.rob_tag, entry.val);
-        if (entry.is_branch) {
-            rob.write_branch_result(
-                entry.rob_tag,
-                entry.branch_actual_taken,
-                entry.branch_target
-            );
-        }
-        if (!alu_cdb.valid) {
-            alu_cdb = entry;
-        }
-    }
-    // write back LSRS
-    auto ls_cdbs = lsrs.write_back();
-    for (size_t i = 0; i < LSRS::LSRS_SIZE; i++) {
-        const CDBEntry& entry = ls_cdbs[i];
-        if (!entry.valid) continue;
-
-        rob.write_result(entry.rob_tag, entry.val);
-        if (!ls_cdb.valid) {
-            ls_cdb = entry;
-        }
-    }
-
-    // store LSRS entries
     for (size_t i = 0; i < LSRS::LSRS_SIZE; i++) {
         const LSRSEntry& e = lsrs.get_entry(i);
         if (!e.busy || !e.done || e.is_load) continue;
 
         rob.write_store_result(e.rob_tag, e.addr, e.vk);
     }
-    if (ls_cdb.valid) {
-        next_cdb = ls_cdb;
-        lsrs.free_entry_by_tag(ls_cdb.rob_tag);
-    } else if (alu_cdb.valid) {
-        next_cdb = alu_cdb;
-        alurs.free_entry_by_tag(alu_cdb.rob_tag);
-    } else {
-        next_cdb = {false, 0, 0, false, false, 0};
+
+    if (winner.valid) {
+        cdb.publish(winner);
+        rob.write_result(winner.rob_tag, winner.val);
+        if (winner.is_branch) {
+            rob.write_branch_result(
+                winner.rob_tag,
+                winner.branch_actual_taken,
+                winner.branch_target
+            );
+        }
+        if (alu_wins) {
+            alurs.free_entry_by_tag(winner.rob_tag);
+        } else {
+            lsrs.free_entry_by_tag(winner.rob_tag);
+        }
     }
 
-    // Stores never use the CDB: their ROB entry contains address and data.
     for (size_t i = 0; i < LSRS::LSRS_SIZE; i++) {
         const LSRSEntry& e = lsrs.get_entry(i);
         if (e.busy && e.done && !e.is_load) {
@@ -393,9 +368,7 @@ void TomasuloCPU::resolve_cycle_outputs() {
     sb.flush_from_next(squash_tag);
     rat.restore_from_next(squash_tag, regf);
     bp->recover();
-    if (next_cdb.valid && next_cdb.rob_tag > squash_tag) {
-        next_cdb = {false, 0, 0, false, false, 0};
-    }
+    cdb.invalidate_squashed(squash_tag);
     next_pc = squash_pc;
     next_fetch_valid = false;
     next_redirect = true;
@@ -439,7 +412,6 @@ void TomasuloCPU::cycle() {
     fetch_valid = next_fetch_valid;
     redirect = next_redirect;
     halted = next_halted;
-    cdb = next_cdb;
     cycle_count++;
 }
 
