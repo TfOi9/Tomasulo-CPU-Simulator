@@ -70,8 +70,34 @@ class GsharePredictor: public BranchPredictor {
     // pattern history table
     std::array<uint8_t, (1 << GLEN)> pht{};
     std::array<uint8_t, (1 << GLEN)> next_pht{};
+
+    BranchPrediction lookup(uint32_t pc, int32_t imm) const;
+    void speculate(bool taken);
+    friend class TournamentPredictor;
+
 public:
     GsharePredictor();
+    BranchPrediction predict(uint32_t pc, int32_t imm) override;
+    void update(uint32_t pc, uint32_t context, bool actual_taken) override;
+    void recover() override;
+    void compute_next() override;
+    void clock() override;
+};
+
+// Tournament predictor
+class TournamentPredictor: public BranchPredictor {
+    static constexpr size_t TABLE_SIZE = 1024;
+    static constexpr uint32_t GSHARE_CONTEXT_MASK = 0xFF;
+    static constexpr uint32_t GSHARE_PRED_BIT = 1u << 8;
+    static constexpr uint32_t BIMODAL_PRED_BIT = 1u << 9;
+    std::array<uint8_t, TABLE_SIZE> counters{};
+    std::array<uint8_t, TABLE_SIZE> next_counters{};
+
+    BimodalPredictor bp;
+    GsharePredictor gp;
+
+public:
+    TournamentPredictor();
     BranchPrediction predict(uint32_t pc, int32_t imm) override;
     void update(uint32_t pc, uint32_t context, bool actual_taken) override;
     void recover() override;

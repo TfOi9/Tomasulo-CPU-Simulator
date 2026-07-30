@@ -53,6 +53,8 @@ add_executable(simulator
     src/alu/alucomp.cpp
 )
 
+target_compile_options(simulator PRIVATE -O3)
+
 add_executable(code
     src/code.cpp
     src/tomasulo/cpu.cpp

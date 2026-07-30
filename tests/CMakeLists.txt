@@ -14,3 +14,11 @@ add_executable(test_single_cdb
 
 add_test(NAME test_single_cdb COMMAND test_single_cdb
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_branchpred
+    tomasulo/test_branchpred.cpp
+    ${CMAKE_SOURCE_DIR}/src/tomasulo/branchpred.cpp
+)
+
+add_test(NAME test_branchpred COMMAND test_branchpred
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
