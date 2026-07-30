@@ -33,7 +33,7 @@ add_library(tomasulo STATIC
     src/tomasulo/tracefile.cpp
 )
 
-add_executable(simulator
+add_executable(code
     src/main.cpp
     src/tomasulo/cpu.cpp
     src/tomasulo/alurs.cpp
@@ -53,8 +53,6 @@ add_executable(simulator
     src/alu/alucomp.cpp
 )
 
-# The supplied pi workload executes roughly 1.5e8 architectural instructions.
-# Optimize the executable even when CMake is invoked without a build type.
 if(NOT MSVC)
     target_compile_options(simulator PRIVATE -O3)
 endif()
