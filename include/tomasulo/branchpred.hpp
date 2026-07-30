@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <array>
+#include <cstddef>
 
 struct BranchPrediction {
     bool taken;
