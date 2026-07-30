@@ -79,6 +79,41 @@ void TomasuloCPU::load_program(const std::string &path) {
     squash_pc = 0;
 }
 
+void TomasuloCPU::input_program() {
+    std::string str, p;
+    while (std::getline(std::cin, str)) {
+        p += str;
+        p += '\n';
+    }
+
+    imem.load_hex_data(p);
+    dmem.load_hex_data(p);
+
+    pc = 0;
+    next_pc = 0;
+    fetched_pc = 0;
+    next_fetched_pc = 0;
+    fetched_pred_taken = false;
+    next_fetched_pred_taken = false;
+    fetched_pred_target = 0;
+    next_fetched_pred_target = 0;
+    fetched_pred_context = 0;
+    next_fetched_pred_context = 0;
+    cdb.clear();
+    fetch_valid = false;
+    next_fetch_valid = false;
+    redirect = false;
+    next_redirect = false;
+    halted = false;
+    next_halted = false;
+    cycle_count = 0;
+    total_branches = 0;
+    mispredicted_branches = 0;
+    squash_pending = false;
+    squash_tag = 0;
+    squash_pc = 0;
+}
+
 void TomasuloCPU::init_next_states() {
     next_pc = pc;
     next_fetched_pc = fetched_pc;

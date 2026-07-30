@@ -92,6 +92,8 @@ public:
     ~TomasuloCPU();
     // load a program .data from path
     void load_program(const std::string& path);
+    // load a program .data from stdin
+    void input_program();
     // run a cycle
     void cycle();
     // run until halt or reached limits
