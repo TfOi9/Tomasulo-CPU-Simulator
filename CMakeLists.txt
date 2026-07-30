@@ -53,10 +53,6 @@ add_executable(code
     src/alu/alucomp.cpp
 )
 
-if(NOT MSVC)
-    target_compile_options(code PRIVATE -O3)
-endif()
-
 set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "*.trace")
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/unit_tests/CMakeLists.txt")
