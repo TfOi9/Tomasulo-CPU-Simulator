@@ -53,6 +53,12 @@ add_executable(simulator
     src/alu/alucomp.cpp
 )
 
+# The supplied pi workload executes roughly 1.5e8 architectural instructions.
+# Optimize the executable even when CMake is invoked without a build type.
+if(NOT MSVC)
+    target_compile_options(simulator PRIVATE -O3)
+endif()
+
 set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "*.trace")
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/unit_tests/CMakeLists.txt")

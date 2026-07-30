@@ -16,6 +16,6 @@ int main(int argc, char **argv) {
     }
     TomasuloCPU cpu(trace);
     cpu.load_program(path);
-    cpu.run(1000000);
+    cpu.run(250000000);
     return 0;
 }

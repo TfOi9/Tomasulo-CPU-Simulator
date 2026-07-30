@@ -20,6 +20,12 @@ uint32_t ArchRegFile::read_reg(size_t index) const {
     return regs[index];
 }
 
+uint32_t ArchRegFile::read_next_reg(size_t index) const {
+    assert(index < FILE_SIZE);
+    if (index == 0) return 0;
+    return new_regs[index];
+}
+
 void ArchRegFile::write_reg(size_t index, uint32_t val) {
     assert(index >= 0 && index < FILE_SIZE);
     if (index == 0) return;

@@ -43,6 +43,32 @@ bool ReorderBuf::is_empty() const {
     return head == tail && !rob[head].busy;
 }
 
+bool ReorderBuf::get_result_if_ready(uint32_t tag, uint32_t& val) const {
+    for (const ROBEntry& entry : rob) {
+        if (entry.busy && entry.tag == tag && entry.ready) {
+            val = entry.val;
+            return true;
+        }
+    }
+    for (const ROBEntry& entry : next_rob) {
+        if (entry.busy && entry.tag == tag && entry.ready) {
+            val = entry.val;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ReorderBuf::contains_tag(uint32_t tag) const {
+    for (const ROBEntry& entry : rob) {
+        if (entry.busy && entry.tag == tag) return true;
+    }
+    for (const ROBEntry& entry : next_rob) {
+        if (entry.busy && entry.tag == tag) return true;
+    }
+    return false;
+}
+
 bool ReorderBuf::is_next_full() const {
     return head_next == tail_next
         && next_rob[head_next].busy == true;
@@ -57,7 +83,7 @@ void ReorderBuf::write_result(uint32_t tag, uint32_t val) {
         }
     }
     
-    assert(index != ROB_SIZE);
+    if (index == ROB_SIZE) return;
     
     next_rob[index].ready = true;
     next_rob[index].val = val;
@@ -73,8 +99,7 @@ void ReorderBuf::write_branch_result(uint32_t tag, bool taken,
         }
     }
     
-    assert(index != ROB_SIZE);
-    assert(rob[index].is_branch == true);
+    if (index == ROB_SIZE || !rob[index].is_branch) return;
 
     next_rob[index].ready = true;
     next_rob[index].branch_actual_taken = taken;
@@ -91,8 +116,7 @@ void ReorderBuf::write_store_result(uint32_t tag, uint32_t addr,
         }
     }
     
-    assert(index != ROB_SIZE);
-    assert(rob[index].is_store == true);
+    if (index == ROB_SIZE || !rob[index].is_store) return;
 
     next_rob[index].ready = true;
     next_rob[index].store_addr = addr;
@@ -120,8 +144,11 @@ bool ReorderBuf::commit() {
 
     // handle branch mispredict
     if (entry.is_branch) {
-        if (entry.branch_actual_taken != entry.branch_pred_taken ||
-            entry.branch_target != entry.pred_target) {
+        bool direction_mismatch =
+            entry.branch_actual_taken != entry.branch_pred_taken;
+        bool target_mismatch = entry.branch_actual_taken &&
+            entry.branch_pred_taken && entry.branch_target != entry.pred_target;
+        if (direction_mismatch || target_mismatch) {
             flush_from_next(entry.tag);
             mispredict = true;
         }

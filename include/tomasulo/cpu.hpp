@@ -79,6 +79,6 @@ public:
     // run a cycle
     void cycle();
     // run until halt or reached limits
-    void run(int max_cycles = 1000000);
+    void run(int max_cycles = 250000000);
 
 };

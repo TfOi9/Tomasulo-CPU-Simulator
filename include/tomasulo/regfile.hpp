@@ -21,6 +21,8 @@ public:
     void flush_zero();
     // read register data from current state
     uint32_t read_reg(size_t index) const;
+    // Value scheduled for the next clock edge (includes this cycle's commit).
+    uint32_t read_next_reg(size_t index) const;
     // write the value into a next state register
     void write_reg(size_t index, uint32_t val);
     // update the state, flipping curr and next

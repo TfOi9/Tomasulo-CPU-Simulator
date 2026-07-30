@@ -30,6 +30,10 @@ public:
     RegAliasTab();
     // read out a single entry
     RATEntry read(size_t index) const;
+    // Read the value being built for the next clock edge.  Issue uses this
+    // after commit so that a just-committed register is not needlessly kept
+    // dependent on an entry which has already left the ROB.
+    RATEntry read_next(size_t index) const;
     // map the target register to the ROB tag
     // used in the Issue stage
     void set_tag_next(uint8_t dest_reg, uint32_t rob_tag);

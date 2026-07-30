@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <array>
 
+class ReorderBuf;
+
 // Load & Save Reservation Station Entry
 struct LSRSEntry {
     // is the rs busy
@@ -60,8 +62,11 @@ public:
     // returns the slot index, or -1 for failure
     int alloc(const Instr& ins, const RegAliasTab& rat,
         uint32_t rob_tag, uint32_t pc);
+    int alloc_resolved(const Instr& ins, const RATEntry& rj,
+        const RATEntry& rk, uint32_t rob_tag, uint32_t pc);
     // listen to the cdb broadcast, catch if match
     void listen_cdb(uint32_t cdb_tag, uint32_t cdb_val);
+    void resolve_from_rob(const ReorderBuf& rob);
     // execute entries that are ready
     void execute(StoreBuffer& sb, SimDataMemory& dmem);
     // write back done entries, returning cdb broadcast list
@@ -70,6 +75,7 @@ public:
     const LSRSEntry& get_entry(size_t idx) const;
     // free all done entries
     void free_done_entries();
+    void free_entry_by_tag(uint32_t rob_tag);
     // check if lsrs is full
     bool is_full() const;
     // flush all entries for restoring

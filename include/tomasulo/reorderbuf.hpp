@@ -79,6 +79,10 @@ public:
     bool is_next_full() const;
     // is the current queue empty
     bool is_empty() const;
+    // Return a completed speculative value.  Searching both buffers makes a
+    // result available to an instruction issued in the same cycle as WB.
+    bool get_result_if_ready(uint32_t tag, uint32_t& val) const;
+    bool contains_tag(uint32_t tag) const;
 
     // --- interface for WriteBack phase ---
     // write the result into ROB after executing

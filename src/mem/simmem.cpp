@@ -29,6 +29,11 @@ void SimMemory::load_hex_data(const std::string &data) {
             assert(newpos < MEM_SIZE);
             mempos = newpos;            
         } else {
+            // Some supplied data files have a leading decimal metadata token.
+            // Treat one hex digit as a byte with a leading zero, and ignore
+            // other non-byte tokens instead of desynchronising the image.
+            if (token.size() != 1 && token.size() != 2) continue;
+            if (token.size() == 1) token.insert(token.begin(), '0');
             uint8_t byte = to_byte(token);
             mem[mempos++] = byte;
         }

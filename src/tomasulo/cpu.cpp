@@ -7,7 +7,7 @@
 #include <iostream>
 
 TomasuloCPU::TomasuloCPU(bool trace): tf(regf, trace) {
-    bp = new NaivePredictor();
+    bp = new BimodalPredictor();
     redirect = false;
     ras_top = 0;
 }
@@ -43,9 +43,12 @@ void TomasuloCPU::init_next_states() {
 }
 
 void TomasuloCPU::cdb_listen() {
-    if (!cdb.valid) return;
-    alurs.listen_cdb(cdb.rob_tag, cdb.val);
-    lsrs.listen_cdb(cdb.rob_tag, cdb.val);
+    if (cdb.valid) {
+        alurs.listen_cdb(cdb.rob_tag, cdb.val);
+        lsrs.listen_cdb(cdb.rob_tag, cdb.val);
+    }
+    alurs.resolve_from_rob(rob);
+    lsrs.resolve_from_rob(rob);
 }
 
 void TomasuloCPU::writeback() {
@@ -70,8 +73,6 @@ void TomasuloCPU::writeback() {
             alu_cdb = entry;
         }
     }
-    alurs.free_done_entries();
-
     // write back LSRS
     auto ls_cdbs = lsrs.write_back();
     for (size_t i = 0; i < LSRS::LSRS_SIZE; i++) {
@@ -91,14 +92,25 @@ void TomasuloCPU::writeback() {
 
         rob.write_store_result(e.rob_tag, e.addr, e.vk);
     }
-    lsrs.free_done_entries();
-
+    // A single CDB can broadcast only one result per clock.  Keep every
+    // unselected producer in its RS so it remains eligible next cycle;
+    // dropping it here loses wakeups for already-issued dependants.
     if (ls_cdb.valid) {
         next_cdb = ls_cdb;
+        lsrs.free_entry_by_tag(ls_cdb.rob_tag);
     } else if (alu_cdb.valid) {
         next_cdb = alu_cdb;
+        alurs.free_entry_by_tag(alu_cdb.rob_tag);
     } else {
         next_cdb = {false, 0, 0, false, false, 0};
+    }
+
+    // Stores never use the CDB: their ROB entry contains address and data.
+    for (size_t i = 0; i < LSRS::LSRS_SIZE; i++) {
+        const LSRSEntry& e = lsrs.get_entry(i);
+        if (e.busy && e.done && !e.is_load) {
+            lsrs.free_entry_by_tag(e.rob_tag);
+        }
     }
 }
 
@@ -183,6 +195,14 @@ void TomasuloCPU::issue() {
         return;
     }
 
+    // A decoded RV32I instruction always carries 5-bit register indices.
+    // Treat malformed speculative instruction bytes as a frontend bubble
+    // instead of allowing them to corrupt the RAT/ROB state.
+    if (ins.rd >= 32 || ins.rs1 >= 32 || ins.rs2 >= 32) {
+        fetch_valid = false;
+        return;
+    }
+
     if (ins.header.type == InstrType::NOP) {
         fetch_valid = false;
         return;
@@ -243,14 +263,39 @@ void TomasuloCPU::issue() {
 
     if (rob_tag < 0) return;
 
-    if (dest_reg != 0) {
+    if (!is_store && dest_reg != 0) {
         rat.set_tag_next(dest_reg, rob_tag);
     }
 
+    // A consumer may be issued after its producer's CDB slot has already
+    // passed.  Resolve from the ROB (and from commit's next RAT state) before
+    // placing it in an RS, otherwise its qj/qk can never be cleared.
+    auto resolve_operand = [this](uint8_t reg) {
+        RATEntry operand = rat.read(reg);
+        if (!operand.ready && operand.tag != 0) {
+            RATEntry newer = rat.read_next(reg);
+            if (newer.ready) operand = newer;
+        }
+        uint32_t value = 0;
+        if (!operand.ready && operand.tag != 0 &&
+            rob.get_result_if_ready(operand.tag, value)) {
+            operand = {true, value, 0};
+        }
+        // A restored RAT can retain an alias for an already-committed entry
+        // when a branch flush and commit share a cycle.  Such a tag cannot
+        // produce another CDB event; its architectural value is authoritative.
+        if (!operand.ready && operand.tag != 0 && !rob.contains_tag(operand.tag)) {
+            operand = {true, regf.read_next_reg(reg), 0};
+        }
+        return operand;
+    };
+    RATEntry rj = resolve_operand(ins.rs1);
+    RATEntry rk = resolve_operand(ins.rs2);
+
     if (needs_alu) {
-        alurs.alloc(ins, rat, rob_tag, fetched_pc);
+        alurs.alloc_resolved(ins, rj, rk, rob_tag, fetched_pc);
     } else if (needs_ls) {
-        lsrs.alloc(ins, rat, rob_tag, fetched_pc);
+        lsrs.alloc_resolved(ins, rj, rk, rob_tag, fetched_pc);
         if (is_store) {
             sb.insert_next(rob_tag, ins.header.type);
         }
@@ -276,15 +321,13 @@ void TomasuloCPU::fetch() {
     if (is_branch) {
         if (type == InstrType::JAL) {
             next_pc = pc + uint32_t(fetched_instr.imm);
-            if (fetched_instr.rd != 0 && ras_top < 16) ras[ras_top++] = pc + 4;
         } else if (type == InstrType::JALR) {
-            if (ras_top > 0) {
-                ras_predicted_target = ras[--ras_top];
-                next_pc = ras_predicted_target;
-            } else {
-                fetch_valid = false;
-                return;
-            }
+            // A speculative RAS must itself be checkpointed and restored on
+            // every branch flush.  Until that state is modeled, use the
+            // deterministic fall-through prediction for indirect jumps;
+            // execute supplies the authoritative target at commit.
+            ras_predicted_target = pc + 4;
+            next_pc = pc + 4;
         } else {
             auto [taken, target] = bp->predict(pc, fetched_instr.imm);
             next_pc = target;

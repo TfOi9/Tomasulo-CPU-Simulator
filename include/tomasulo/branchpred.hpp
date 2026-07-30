@@ -2,6 +2,7 @@
 
 #include <utility>
 #include <cstdint>
+#include <array>
 
 class BranchPredictor {
 public:
@@ -25,4 +26,16 @@ public:
     // naive predictor does nothing
     void update(uint32_t pc, bool actual_taken);
     
+};
+
+// Small bimodal 2-bit predictor.  It keeps loop back-edges predicted taken
+// after the first iteration while retaining a well-defined fall-through
+// prediction for unseen branches.
+class BimodalPredictor: public BranchPredictor {
+    static constexpr size_t TABLE_SIZE = 1024;
+    std::array<uint8_t, TABLE_SIZE> counters{};
+public:
+    BimodalPredictor();
+    std::pair<bool, uint32_t> predict(uint32_t pc, int32_t imm) override;
+    void update(uint32_t pc, bool actual_taken) override;
 };

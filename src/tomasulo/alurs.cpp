@@ -1,17 +1,20 @@
 #include "../../include/tomasulo/alurs.hpp"
 #include "../../include/alu/alucomp.hpp"
+#include "../../include/tomasulo/reorderbuf.hpp"
 
 #include <cassert>
 
 int ALURS::alloc(const Instr &ins, const RegAliasTab &rat,
         uint32_t rob_tag, uint32_t pc) {
+    return alloc_resolved(ins, rat.read(ins.rs1), rat.read(ins.rs2), rob_tag, pc);
+}
+
+int ALURS::alloc_resolved(const Instr &ins, const RATEntry &rj,
+        const RATEntry &rk, uint32_t rob_tag, uint32_t pc) {
     for (size_t i = 0; i < ALURS_SIZE; i++) {
         if (next_alurs[i].busy) {
             continue;
         }
-
-        RATEntry rj = rat.read(ins.rs1);
-        RATEntry rk = rat.read(ins.rs2);
 
         ALURSEntry entry {
             true,
@@ -51,6 +54,23 @@ void ALURS::listen_cdb(uint32_t cdb_tag, uint32_t cdb_val) {
             next_alurs[i].vk_ready = true;
             next_alurs[i].vk = cdb_val;
             next_alurs[i].qk = 0;
+        }
+    }
+}
+
+void ALURS::resolve_from_rob(const ReorderBuf& rob) {
+    for (ALURSEntry& entry : next_alurs) {
+        if (!entry.busy) continue;
+        uint32_t value = 0;
+        if (entry.qj != 0 && rob.get_result_if_ready(entry.qj, value)) {
+            entry.vj_ready = true;
+            entry.vj = value;
+            entry.qj = 0;
+        }
+        if (entry.qk != 0 && rob.get_result_if_ready(entry.qk, value)) {
+            entry.vk_ready = true;
+            entry.vk = value;
+            entry.qk = 0;
         }
     }
 }
@@ -144,6 +164,16 @@ void ALURS::free_done_entries() {
         if (next_alurs[i].done) {
             next_alurs[i].busy = false;
             next_alurs[i].done = false;
+        }
+    }
+}
+
+void ALURS::free_entry_by_tag(uint32_t rob_tag) {
+    for (ALURSEntry& entry : next_alurs) {
+        if (entry.busy && entry.rob_tag == rob_tag) {
+            entry.busy = false;
+            entry.done = false;
+            return;
         }
     }
 }
