@@ -2,7 +2,7 @@
 
 int StoreBuffer::insert_next(uint32_t rob_tag, InstrType type) {
     for (size_t i = 0; i < SB_SIZE; i++) {
-        if (!next_sb[i].busy) {
+        if (!sb[i].busy) {
             next_sb[i] = {
                 true,
                 rob_tag,
@@ -20,7 +20,8 @@ int StoreBuffer::insert_next(uint32_t rob_tag, InstrType type) {
 
 void StoreBuffer::set_addr_ready_next(uint32_t rob_tag, uint32_t addr) {
     for (size_t i = 0; i < SB_SIZE; i++) {
-        if (next_sb[i].busy && next_sb[i].rob_tag == rob_tag) {
+        if (sb[i].busy && sb[i].rob_tag == rob_tag &&
+            next_sb[i].busy && next_sb[i].rob_tag == rob_tag) {
             next_sb[i].addr = addr;
             next_sb[i].addr_ready = true;
             break;
@@ -30,7 +31,8 @@ void StoreBuffer::set_addr_ready_next(uint32_t rob_tag, uint32_t addr) {
 
 void StoreBuffer::set_val_ready_next(uint32_t rob_tag, uint32_t val) {
     for (size_t i = 0; i < SB_SIZE; i++) {
-        if (next_sb[i].busy && next_sb[i].rob_tag == rob_tag) {
+        if (sb[i].busy && sb[i].rob_tag == rob_tag &&
+            next_sb[i].busy && next_sb[i].rob_tag == rob_tag) {
             next_sb[i].val = val;
             next_sb[i].val_ready = true;
             break;
@@ -87,7 +89,7 @@ void StoreBuffer::commit_next(uint32_t rob_tag) {
 
 void StoreBuffer::flush_from_next(uint32_t flush_tag) {
     for (size_t i = 0; i < SB_SIZE; i++) {
-        if (sb[i].busy && sb[i].rob_tag > flush_tag) {
+        if (next_sb[i].busy && next_sb[i].rob_tag > flush_tag) {
             next_sb[i].busy = false;
         }
     }
@@ -102,7 +104,7 @@ bool StoreBuffer::all_addrs_known() const {
 
 bool StoreBuffer::is_full() const {
     for (size_t i = 0; i < SB_SIZE; i++) {
-        if (!next_sb[i].busy) return false;
+        if (!sb[i].busy) return false;
     }
     return true;
 }

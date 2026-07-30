@@ -69,6 +69,7 @@ public:
     void resolve_from_rob(const ReorderBuf& rob);
     // execute entries that are ready
     void execute(StoreBuffer& sb, SimDataMemory& dmem);
+    void mark_mem_requested(uint32_t rob_tag);
     // write back done entries, returning cdb broadcast list
     std::array<CDBEntry, LSRS_SIZE> write_back();
     // fetch an lsrs entry

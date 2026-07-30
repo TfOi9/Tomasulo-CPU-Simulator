@@ -8,8 +8,13 @@ std::pair<bool, uint32_t> NaivePredictor::predict(uint32_t pc, int32_t imm) {
 
 void NaivePredictor::update(uint32_t pc, bool actual_taken) {}
 
+void NaivePredictor::compute_next() {}
+
+void NaivePredictor::clock() {}
+
 BimodalPredictor::BimodalPredictor() {
     counters.fill(1);
+    next_counters = counters;
 }
 
 std::pair<bool, uint32_t> BimodalPredictor::predict(uint32_t pc, int32_t imm) {
@@ -18,10 +23,18 @@ std::pair<bool, uint32_t> BimodalPredictor::predict(uint32_t pc, int32_t imm) {
 }
 
 void BimodalPredictor::update(uint32_t pc, bool actual_taken) {
-    uint8_t& counter = counters[(pc >> 2) % TABLE_SIZE];
+    uint8_t& counter = next_counters[(pc >> 2) % TABLE_SIZE];
     if (actual_taken) {
         if (counter < 3) ++counter;
     } else if (counter > 0) {
         --counter;
     }
+}
+
+void BimodalPredictor::compute_next() {
+    next_counters = counters;
+}
+
+void BimodalPredictor::clock() {
+    std::swap(counters, next_counters);
 }

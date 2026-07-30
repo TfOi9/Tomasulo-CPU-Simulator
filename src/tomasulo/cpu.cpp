@@ -6,11 +6,32 @@
 #include <cassert>
 #include <iostream>
 
-TomasuloCPU::TomasuloCPU(bool trace): tf(regf, trace) {
-    bp = new BimodalPredictor();
-    redirect = false;
-    ras_top = 0;
-}
+TomasuloCPU::TomasuloCPU(bool trace)
+    : cdb{false, 0, 0, false, false, 0},
+      next_cdb{false, 0, 0, false, false, 0},
+      bp(new BimodalPredictor()),
+      tf(regf, trace),
+      pc(0),
+      next_pc(0),
+      fetched_pc(0),
+      next_fetched_pc(0),
+      ras{},
+      ras_top(0),
+      ras_predicted_target(0),
+      fetched_instr{},
+      next_fetched_instr{},
+      fetch_valid(false),
+      next_fetch_valid(false),
+      redirect(false),
+      next_redirect(false),
+      halted(false),
+      next_halted(false),
+      cycle_count(0),
+      total_branches(0),
+      mispredicted_branches(0),
+      squash_pending(false),
+      squash_tag(0),
+      squash_pc(0) {}
 
 TomasuloCPU::~TomasuloCPU() {
     delete bp;
@@ -30,16 +51,43 @@ void TomasuloCPU::load_program(const std::string &path) {
     dmem.load_hex_data(ss.str());
 
     pc = 0;
+    next_pc = 0;
+    fetched_pc = 0;
+    next_fetched_pc = 0;
+    cdb = {false, 0, 0, false, false, 0};
+    next_cdb = {false, 0, 0, false, false, 0};
+    fetch_valid = false;
+    next_fetch_valid = false;
+    redirect = false;
+    next_redirect = false;
     halted = false;
+    next_halted = false;
+    cycle_count = 0;
+    total_branches = 0;
+    mispredicted_branches = 0;
+    squash_pending = false;
+    squash_tag = 0;
+    squash_pc = 0;
 }
 
 void TomasuloCPU::init_next_states() {
+    next_pc = pc;
+    next_fetched_pc = fetched_pc;
+    next_fetched_instr = fetched_instr;
+    next_fetch_valid = fetch_valid;
+    next_redirect = redirect;
+    next_halted = halted;
+    squash_pending = false;
+    squash_tag = 0;
+    squash_pc = 0;
     regf.prepare_next();
     rat.compute_next();
     rob.compute_next();
     alurs.compute_next();
     lsrs.compute_next();
     sb.compute_next();
+    dmem.compute_next();
+    bp->compute_next();
 }
 
 void TomasuloCPU::cdb_listen() {
@@ -136,12 +184,11 @@ void TomasuloCPU::commit() {
 
         // write data memory
         if (is_store) {
-            if (dmem.is_busy()) break;
-            dmem.issue_write_next(
+            if (!dmem.issue_write_next(
                 entry.store_addr,
                 entry.store_value,
                 entry.type
-            );
+            )) break;
         }
 
         // write arch register
@@ -167,16 +214,9 @@ void TomasuloCPU::commit() {
 
         if (mis) {
             mispredicted_branches++;
-
-            alurs.flush_next();
-            lsrs.flush_next();
-            sb.flush_from_next(tag);
-            rat.restore_from_next(tag, regf);
-
-            next_pc = actual_taken ? br_target : (entry_pc + 4);
-            fetch_valid = false;
-            redirect = true;
-            halted = false;
+            squash_pending = true;
+            squash_tag = tag;
+            squash_pc = actual_taken ? br_target : (entry_pc + 4);
             break;
         }
 
@@ -190,8 +230,8 @@ void TomasuloCPU::issue() {
     const Instr& ins = fetched_instr;
 
     if (ins.header.type == InstrType::HALT) {
-        halted = true;
-        fetch_valid = false;
+        next_halted = true;
+        next_fetch_valid = false;
         return;
     }
 
@@ -199,16 +239,16 @@ void TomasuloCPU::issue() {
     // Treat malformed speculative instruction bytes as a frontend bubble
     // instead of allowing them to corrupt the RAT/ROB state.
     if (ins.rd >= 32 || ins.rs1 >= 32 || ins.rs2 >= 32) {
-        fetch_valid = false;
+        next_fetch_valid = false;
         return;
     }
 
     if (ins.header.type == InstrType::NOP) {
-        fetch_valid = false;
+        next_fetch_valid = false;
         return;
     }
     if (ins.header.type == InstrType::UNKNOWN) {
-        fetch_valid = false;
+        next_fetch_valid = false;
         return;
     }
 
@@ -227,7 +267,7 @@ void TomasuloCPU::issue() {
         is_load = !is_store;
     }
 
-    if (rob.is_next_full()) return;
+    if (rob.is_full()) return;
     if (needs_alu && alurs.is_full()) return;
     if (needs_ls && lsrs.is_full()) return;
     if (is_store && sb.is_full()) return;
@@ -267,25 +307,14 @@ void TomasuloCPU::issue() {
         rat.set_tag_next(dest_reg, rob_tag);
     }
 
-    // A consumer may be issued after its producer's CDB slot has already
-    // passed.  Resolve from the ROB (and from commit's next RAT state) before
-    // placing it in an RS, otherwise its qj/qk can never be cleared.
+    // The issue phase reads only current state.  A result already resident in
+    // the current ROB can be forwarded even if its one-cycle CDB pulse passed.
     auto resolve_operand = [this](uint8_t reg) {
         RATEntry operand = rat.read(reg);
-        if (!operand.ready && operand.tag != 0) {
-            RATEntry newer = rat.read_next(reg);
-            if (newer.ready) operand = newer;
-        }
         uint32_t value = 0;
         if (!operand.ready && operand.tag != 0 &&
             rob.get_result_if_ready(operand.tag, value)) {
             operand = {true, value, 0};
-        }
-        // A restored RAT can retain an alias for an already-committed entry
-        // when a branch flush and commit share a cycle.  Such a tag cannot
-        // produce another CDB event; its architectural value is authoritative.
-        if (!operand.ready && operand.tag != 0 && !rob.contains_tag(operand.tag)) {
-            operand = {true, regf.read_next_reg(reg), 0};
         }
         return operand;
     };
@@ -301,26 +330,26 @@ void TomasuloCPU::issue() {
         }
     }
 
-    fetch_valid = false;
+    next_fetch_valid = false;
 }
 
 void TomasuloCPU::fetch() {
     if (redirect) {
-        redirect = false;
+        next_redirect = false;
         return;
     }
     if (fetch_valid || halted) return;
     uint32_t raw = imem.read_instr(pc);
-    fetched_instr = Instr::decode(raw);
-    fetched_pc = pc;
-    fetch_valid = true;
+    next_fetched_instr = Instr::decode(raw);
+    next_fetched_pc = pc;
+    next_fetch_valid = true;
 
-    InstrType type = fetched_instr.header.type;
-    bool is_branch = (fetched_instr.header.place == InstrPlace::BRANCH);
+    InstrType type = next_fetched_instr.header.type;
+    bool is_branch = (next_fetched_instr.header.place == InstrPlace::BRANCH);
 
     if (is_branch) {
         if (type == InstrType::JAL) {
-            next_pc = pc + uint32_t(fetched_instr.imm);
+            next_pc = pc + uint32_t(next_fetched_instr.imm);
         } else if (type == InstrType::JALR) {
             // A speculative RAS must itself be checkpointed and restored on
             // every branch flush.  Until that state is modeled, use the
@@ -329,7 +358,7 @@ void TomasuloCPU::fetch() {
             ras_predicted_target = pc + 4;
             next_pc = pc + 4;
         } else {
-            auto [taken, target] = bp->predict(pc, fetched_instr.imm);
+            auto [taken, target] = bp->predict(pc, next_fetched_instr.imm);
             next_pc = target;
         }
     } else {
@@ -341,18 +370,44 @@ void TomasuloCPU::finalize() {
     regf.flush_zero();
 }
 
+void TomasuloCPU::resolve_cycle_outputs() {
+    if (!squash_pending) return;
+
+    // A branch recovery has priority over every younger phase output.  This
+    // merge runs after all phases, so it has the same result regardless of
+    // whether issue/fetch happened before or after commit in the C++ source.
+    rob.flush_from_next(squash_tag);
+    alurs.flush_next();
+    lsrs.flush_next();
+    sb.flush_from_next(squash_tag);
+    rat.restore_from_next(squash_tag, regf);
+    if (next_cdb.valid && next_cdb.rob_tag > squash_tag) {
+        next_cdb = {false, 0, 0, false, false, 0};
+    }
+    next_pc = squash_pc;
+    next_fetch_valid = false;
+    next_redirect = true;
+    next_halted = false;
+}
+
 void TomasuloCPU::cycle() {
     // initialize
     init_next_states();
 
     // pipeline
-    cdb_listen();
-    writeback();
+    fetch();
     commit();
     execute();
+    cdb_listen();
+    writeback();
     issue();
-    fetch();
     finalize();
+
+    resolve_cycle_outputs();
+    uint32_t accepted_load = dmem.resolve_requests(!squash_pending);
+    if (accepted_load != 0) {
+        lsrs.mark_mem_requested(accepted_load);
+    }
 
     // update
     regf.update();
@@ -362,7 +417,13 @@ void TomasuloCPU::cycle() {
     lsrs.update();
     sb.update();
     dmem.update();
+    bp->clock();
     pc = next_pc;
+    fetched_pc = next_fetched_pc;
+    fetched_instr = next_fetched_instr;
+    fetch_valid = next_fetch_valid;
+    redirect = next_redirect;
+    halted = next_halted;
     cdb = next_cdb;
     cycle_count++;
 }

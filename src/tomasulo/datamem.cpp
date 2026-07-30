@@ -6,32 +6,35 @@ void SimDataMemory::load_hex_data(const std::string &data) {
     mem.load_hex_data(data);
 }
 
-void SimDataMemory::issue_read_next(size_t addr, InstrType type) {
-    assert(!rq.valid && !next.valid);
-
-    next = MemRq {
+void SimDataMemory::issue_read_next(size_t addr, InstrType type,
+        uint32_t rob_tag) {
+    if (is_busy() || pending_load.valid) return;
+    pending_load = MemRq {
         true,
         true,
         false,
         type,
         addr,
         0,
-        3
+        3,
+        rob_tag
     };
 }
 
-void SimDataMemory::issue_write_next(size_t addr, uint32_t val, InstrType type) {
-    assert(!rq.valid && !next.valid);
-
-    next = MemRq {
+bool SimDataMemory::issue_write_next(size_t addr, uint32_t val,
+        InstrType type) {
+    if (is_busy() || pending_store.valid) return false;
+    pending_store = MemRq {
         true,
         false,
         false,
         type,
         addr,
         val,
+        0,
         0
     };
+    return true;
 }
 
 void SimDataMemory::decrease_left_cycles() {
@@ -40,29 +43,29 @@ void SimDataMemory::decrease_left_cycles() {
     }
 
     if (rq.cycles_left > 0) {
-        rq.cycles_left--;
+        next.cycles_left = rq.cycles_left - 1;
     } else {
         if (rq.is_load == true) {
             switch (rq.type) {
                 case InstrType::LB:
-                    rq.val = mem.read_byte(rq.addr, false);
+                    next.val = mem.read_byte(rq.addr, false);
                     break;
                 case InstrType::LBU:
-                    rq.val = mem.read_byte(rq.addr, true);
+                    next.val = mem.read_byte(rq.addr, true);
                     break;
                 case InstrType::LH:
-                    rq.val = mem.read_half(rq.addr, false);
+                    next.val = mem.read_half(rq.addr, false);
                     break;
                 case InstrType::LHU:
-                    rq.val = mem.read_half(rq.addr, true);
+                    next.val = mem.read_half(rq.addr, true);
                     break;
                 case InstrType::LW:
-                    rq.val = mem.read_word(rq.addr);
+                    next.val = mem.read_word(rq.addr);
                     break;
                 default:
                     assert(false);
             }
-            rq.read_ready = true;
+            next.read_ready = true;
         } else {
             switch (rq.type) {
                 case InstrType::SB:
@@ -78,21 +81,49 @@ void SimDataMemory::decrease_left_cycles() {
                     assert(false);
             }
         }
-        rq.valid = false;
+        next.valid = false;
     }
 }
 
 bool SimDataMemory::is_busy() const {
-    return rq.valid || next.valid;
+    return rq.valid || rq.read_ready;
 }
 
 bool SimDataMemory::read_ready() const {
     return rq.read_ready;
 }
 
+uint32_t SimDataMemory::read_rob_tag() const {
+    assert(read_ready());
+    return rq.rob_tag;
+}
+
+void SimDataMemory::consume_read_next() {
+    if (rq.read_ready) next.read_ready = false;
+}
+
 uint32_t SimDataMemory::get_result() const {
     assert(read_ready());
     return rq.val;
+}
+
+void SimDataMemory::compute_next() {
+    next = rq;
+    pending_load = {};
+    pending_store = {};
+}
+
+uint32_t SimDataMemory::resolve_requests(bool allow_load) {
+    if (is_busy()) return 0;
+    if (pending_store.valid) {
+        next = pending_store;
+        return 0;
+    }
+    if (allow_load && pending_load.valid) {
+        next = pending_load;
+        return pending_load.rob_tag;
+    }
+    return 0;
 }
 
 void SimDataMemory::update() {

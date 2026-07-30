@@ -12,7 +12,7 @@ int ALURS::alloc(const Instr &ins, const RegAliasTab &rat,
 int ALURS::alloc_resolved(const Instr &ins, const RATEntry &rj,
         const RATEntry &rk, uint32_t rob_tag, uint32_t pc) {
     for (size_t i = 0; i < ALURS_SIZE; i++) {
-        if (next_alurs[i].busy) {
+        if (alurs[i].busy) {
             continue;
         }
 
@@ -42,15 +42,15 @@ int ALURS::alloc_resolved(const Instr &ins, const RATEntry &rj,
 
 void ALURS::listen_cdb(uint32_t cdb_tag, uint32_t cdb_val) {
     for (size_t i = 0; i < ALURS_SIZE; i++) {
-        if (!next_alurs[i].busy) {
+        if (!alurs[i].busy) {
             continue;
         }
-        if (next_alurs[i].qj == cdb_tag) {
+        if (alurs[i].qj == cdb_tag) {
             next_alurs[i].vj_ready = true;
             next_alurs[i].vj = cdb_val;
             next_alurs[i].qj = 0;
         }
-        if (next_alurs[i].qk == cdb_tag) {
+        if (alurs[i].qk == cdb_tag) {
             next_alurs[i].vk_ready = true;
             next_alurs[i].vk = cdb_val;
             next_alurs[i].qk = 0;
@@ -59,27 +59,31 @@ void ALURS::listen_cdb(uint32_t cdb_tag, uint32_t cdb_val) {
 }
 
 void ALURS::resolve_from_rob(const ReorderBuf& rob) {
-    for (ALURSEntry& entry : next_alurs) {
+    for (size_t i = 0; i < ALURS_SIZE; ++i) {
+        const ALURSEntry& entry = alurs[i];
+        ALURSEntry& next = next_alurs[i];
         if (!entry.busy) continue;
         uint32_t value = 0;
         if (entry.qj != 0 && rob.get_result_if_ready(entry.qj, value)) {
-            entry.vj_ready = true;
-            entry.vj = value;
-            entry.qj = 0;
+            next.vj_ready = true;
+            next.vj = value;
+            next.qj = 0;
         }
         if (entry.qk != 0 && rob.get_result_if_ready(entry.qk, value)) {
-            entry.vk_ready = true;
-            entry.vk = value;
-            entry.qk = 0;
+            next.vk_ready = true;
+            next.vk = value;
+            next.qk = 0;
         }
     }
 }
 
 void ALURS::execute() {
     for (size_t i = 0; i < ALURS_SIZE; i++) {
-        ALURSEntry& entry = next_alurs[i];
-        if (!entry.busy || entry.done) continue;
-        if (entry.qj || entry.qk) continue;
+        const ALURSEntry& current = alurs[i];
+        if (!current.busy || current.done) continue;
+        if (current.qj || current.qk) continue;
+
+        ALURSEntry entry = current;
         if (entry.is_branch) {
             switch (entry.type) {
                 case InstrType::BEQ:
@@ -137,6 +141,9 @@ void ALURS::execute() {
             }
         }
         entry.done = true;
+        if (next_alurs[i].busy && next_alurs[i].rob_tag == current.rob_tag) {
+            next_alurs[i] = entry;
+        }
     }
 }
 
@@ -144,8 +151,8 @@ std::array<CDBEntry, ALURS::ALURS_SIZE> ALURS::write_back() {
     std::array<CDBEntry, ALURS_SIZE> arr{};
     int index = 0;
     for (size_t i = 0; i < ALURS_SIZE; i++) {
-        if (!next_alurs[i].busy || !next_alurs[i].done) continue;
-        ALURSEntry& entry = next_alurs[i];
+        if (!alurs[i].busy || !alurs[i].done) continue;
+        const ALURSEntry& entry = alurs[i];
         arr[index] = {
             true,
             entry.rob_tag,
@@ -169,10 +176,11 @@ void ALURS::free_done_entries() {
 }
 
 void ALURS::free_entry_by_tag(uint32_t rob_tag) {
-    for (ALURSEntry& entry : next_alurs) {
-        if (entry.busy && entry.rob_tag == rob_tag) {
-            entry.busy = false;
-            entry.done = false;
+    for (size_t i = 0; i < ALURS_SIZE; ++i) {
+        if (alurs[i].busy && alurs[i].rob_tag == rob_tag &&
+            next_alurs[i].rob_tag == rob_tag) {
+            next_alurs[i].busy = false;
+            next_alurs[i].done = false;
             return;
         }
     }
