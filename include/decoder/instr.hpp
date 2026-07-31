@@ -22,6 +22,8 @@ enum class InstrClass {
 
 // Detailed instruction types
 enum class InstrType {
+    // RV32I Base
+
     // arithmetic
     ADD, SUB, AND, OR, XOR,
     SLL, SRL, SRA, SLT, SLTU,
@@ -35,6 +37,14 @@ enum class InstrType {
     BNE, JAL, JALR,
     // other
     AUIPC, LUI, NOP, HALT,
+
+    // M Extension
+
+    // multiplication
+    MUL, MULH, MULHSU, MULHU,
+    // division
+    DIV, DIVU, REM, REMU,
+    
     // unknown or unsupported (eg. ebreak, ecall)
     UNKNOWN
 };
@@ -92,6 +102,9 @@ constexpr InstrClass instr_class_mapping[] = {
     InstrClass::B, InstrClass::J, InstrClass::I,
     // U-type, pseudo/custom, unknown
     InstrClass::U, InstrClass::U, InstrClass::I, InstrClass::UNKNOWN,
+    // R-type M extension
+    InstrClass::R, InstrClass::R, InstrClass::R, InstrClass::R, InstrClass::R, 
+    InstrClass::R, InstrClass::R, InstrClass::R,
     InstrClass::UNKNOWN,
 };
 
@@ -111,6 +124,9 @@ constexpr InstrPlace instr_place_mapping[] = {
     InstrPlace::BRANCH, InstrPlace::BRANCH, InstrPlace::BRANCH,
     // U-type → REG, pseudo/custom → NOP, unknown → NOP
     InstrPlace::REG, InstrPlace::REG, InstrPlace::NOP, InstrPlace::NOP,
+    //  R-type arithmetic (M extension) → ALU
+    InstrPlace::ALU, InstrPlace::ALU, InstrPlace::ALU, InstrPlace::ALU, InstrPlace::ALU,
+    InstrPlace::ALU, InstrPlace::ALU, InstrPlace::ALU,
     InstrPlace::NOP,
 };
 
@@ -130,5 +146,8 @@ const std::string instr_name[] = {
     "bne",  "jal",  "jalr",
     // U-type, pseudo/custom, unknown
     "auipc","lui",  "nop",  "halt",
+    // R-type (M extension)
+    "mul", "mulh", "mulhsu", "mulhu",
+    "div", "divu", "rem", "remu",
     "unknown",
 };
