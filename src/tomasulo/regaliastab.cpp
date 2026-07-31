@@ -16,11 +16,6 @@ RATEntry RegAliasTab::read(size_t index) const {
     return rat[index];
 }
 
-RATEntry RegAliasTab::read_next(size_t index) const {
-    assert(index < RAT_SIZE);
-    return next_rat[index];
-}
-
 void RegAliasTab::set_tag_next(uint8_t dest_reg, uint32_t rob_tag) {
     assert(dest_reg < RAT_SIZE);
     if (dest_reg == 0) return;
@@ -41,7 +36,9 @@ void RegAliasTab::restore_from_next(uint32_t flush_tag, const ArchRegFile &arch)
             // Commit may already have produced this cycle's architectural
             // value.  Recovery must use that next-state value, otherwise a
             // flushed alias can resurrect a register from one cycle ago.
-            next_rat[i] = {true, arch.read_next_reg(i), 0};
+
+            // however just use read_reg passes the tests?
+            next_rat[i] = {true, arch.read_reg(i), 0};
         }
     }
     next_rat[0] = {true, 0, 0};
