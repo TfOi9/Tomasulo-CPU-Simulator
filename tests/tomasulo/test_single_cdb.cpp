@@ -25,7 +25,7 @@ void check(bool condition, const std::string& message) {
 
 Instr make_instr(InstrType type, InstrClass clas, InstrPlace place,
         int32_t imm = 0) {
-    return {{0, 0, 0, type, clas, place}, 0, 0, 0, 0, imm};
+    return {{0, 0, 0, InstrExType::RV32I, type, clas, place}, 0, 0, 0, 0, imm};
 }
 
 int add_alu(ALURS& rs, const Instr& instr, const RATEntry& rj,

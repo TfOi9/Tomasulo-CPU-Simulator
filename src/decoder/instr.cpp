@@ -1,4 +1,3 @@
-#include <iostream>
 #include "../../include/decoder/instr.hpp"
 
 #include <cassert>
@@ -6,7 +5,15 @@
 Instr Instr::decode(uint32_t raw) {
     if (raw == 0x0ff00513) {
         return {
-            {0, 0, 0, InstrType::HALT, InstrClass::UNKNOWN, InstrPlace::NOP},
+            {
+                0,
+                0,
+                0,
+                InstrExType::CUSTOM,
+                InstrType::HALT,
+                InstrClass::UNKNOWN,
+                InstrPlace::NOP
+            },
             raw,
             0, 0, 255
         };
@@ -20,6 +27,7 @@ Instr Instr::decode(uint32_t raw) {
     uint8_t rs2 = (raw >> 20) & 0x1F;
     int32_t imm = 0;
     InstrType type = InstrType::UNKNOWN;
+    InstrExType ex = InstrExType::RV32I;
 
     switch (opcode) {
         case 0b0110011: // R
@@ -256,6 +264,7 @@ Instr Instr::decode(uint32_t raw) {
             opcode,
             funct7,
             funct3,
+            ex,
             type,
             instr_class_mapping[type_int],
             instr_place_mapping[type_int]

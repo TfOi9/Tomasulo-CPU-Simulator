@@ -3,6 +3,18 @@
 #include <string>
 #include <cstdint>
 
+// RISCV Extension type
+enum class InstrExType {
+    // base 32-bit integer instructions
+    RV32I,
+    // extention for integer multiplication and division
+    M,
+    // extension for single-precision floating-point
+    F,
+    // special extensions (eg. HALT)
+    CUSTOM
+};
+
 // Class of instructions
 enum class InstrClass {
     R, I, S, B, U, J, UNKNOWN
@@ -37,6 +49,8 @@ struct InstrHeader {
     uint8_t opcode;
     uint8_t funct7;
     uint8_t funct3;
+    // instruction extension type
+    InstrExType ex;
     // detailed instruction type
     InstrType type;
     // single-letter instruction class
