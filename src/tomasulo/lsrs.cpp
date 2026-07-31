@@ -5,13 +5,18 @@
 namespace {
 uint32_t load_value(InstrType type, uint32_t value) {
     switch (type) {
-        // Keep forwarding bit-for-bit consistent with DataMemory's existing
-        // API convention (the boolean passed by the interpreter is inverted
-        // relative to the ISA mnemonic names).
-        case InstrType::LB:  return value & 0xffu;
-        case InstrType::LBU: return uint32_t(int32_t(int8_t(value)));
-        case InstrType::LH:  return value & 0xffffu;
-        case InstrType::LHU: return uint32_t(int32_t(int16_t(value)));
+        case InstrType::LB: {
+            uint32_t byte = value & 0xffu;
+            return (byte & 0x80u) ? byte | 0xffffff00u : byte;
+        }
+        case InstrType::LBU:
+            return value & 0xffu;
+        case InstrType::LH: {
+            uint32_t half = value & 0xffffu;
+            return (half & 0x8000u) ? half | 0xffff0000u : half;
+        }
+        case InstrType::LHU:
+            return value & 0xffffu;
         case InstrType::LW:  return value;
         default: assert(false);
     }

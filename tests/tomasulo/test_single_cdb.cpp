@@ -233,6 +233,61 @@ void test_forwarded_load_limit() {
         "second forwarded load completes later");
 }
 
+void test_load_extension_paths() {
+    struct LoadCase {
+        InstrType type;
+        uint32_t stored_value;
+        uint32_t memory_addr;
+        uint32_t expected;
+        const char* name;
+    };
+    const LoadCase cases[] = {
+        {InstrType::LB,  0x80,       0x100, 0xffffff80, "LB"},
+        {InstrType::LBU, 0x80,       0x100, 0x00000080, "LBU"},
+        {InstrType::LH,  0x8001,     0x102, 0xffff8001, "LH"},
+        {InstrType::LHU, 0x8001,     0x102, 0x00008001, "LHU"},
+        {InstrType::LW,  0x92345678, 0x104, 0x92345678, "LW"},
+    };
+
+    for (const LoadCase& load_case : cases) {
+        LSRS forwarded_rs;
+        StoreBuffer sb;
+        SimDataMemory unused_dmem;
+        prepare_store(sb, 1, 0x80, load_case.stored_value);
+
+        Instr load = make_instr(
+            load_case.type, InstrClass::I, InstrPlace::LSB);
+        add_ls(forwarded_rs, load, {true, 0x80, 0}, {true, 0, 0}, 2);
+        execute(forwarded_rs, sb, unused_dmem);
+        CDBEntry forwarded = forwarded_rs.writeback_candidate();
+        check(forwarded.valid && forwarded.val == load_case.expected,
+            std::string(load_case.name) +
+            " applies the correct extension to a forwarded value");
+
+        LSRS memory_rs;
+        StoreBuffer empty_sb;
+        SimDataMemory dmem;
+        dmem.load_hex_data(
+            "@00000100\n"
+            "80 00 01 80 78 56 34 92\n");
+        add_ls(memory_rs, load, {true, load_case.memory_addr, 0},
+            {true, 0, 0}, 2);
+
+        CDBEntry memory{};
+        for (int cycle = 0; cycle < 8 && !memory.valid; ++cycle) {
+            execute(memory_rs, empty_sb, dmem);
+            memory = memory_rs.writeback_candidate();
+        }
+        check(memory.valid && memory.val == load_case.expected,
+            std::string(load_case.name) +
+            " applies the correct extension to a memory value");
+        check(forwarded.valid && memory.valid &&
+            forwarded.val == memory.val,
+            std::string(load_case.name) +
+            " produces identical forwarded and memory-path values");
+    }
+}
+
 void test_memory_response_priority() {
     LSRS rs;
     StoreBuffer sb;
@@ -341,6 +396,7 @@ int main() {
     test_alu_single_completion();
     test_branch_metadata();
     test_forwarded_load_limit();
+    test_load_extension_paths();
     test_memory_response_priority();
     test_repeated_contention();
 
