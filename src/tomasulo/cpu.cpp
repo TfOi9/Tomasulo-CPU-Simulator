@@ -7,7 +7,7 @@
 #include <iostream>
 
 TomasuloCPU::TomasuloCPU(bool trace)
-    : bp(new TournamentPredictor()),
+    : bp(new TAGEPredictor()),
       tf(regf, trace),
       pc(0),
       next_pc(0),
