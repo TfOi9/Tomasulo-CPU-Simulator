@@ -191,62 +191,62 @@ void TomasuloCPU::execute() {
 }
 
 void TomasuloCPU::commit() {
-    while (rob.can_commit()) {
-        const ROBEntry& entry = rob.head_entry();
+    if (!rob.can_commit()) {
+        return;
+    }
 
-        bool is_store = entry.is_store;
-        bool is_branch = entry.is_branch;
-        uint32_t tag = entry.tag;
-        uint8_t dest_reg = entry.dest_reg;
-        uint32_t val = entry.val;
-        uint32_t entry_pc = entry.pc;
-        bool actual_taken = entry.branch_actual_taken;
-        uint32_t br_target = entry.branch_target;
-        bool pred_taken = entry.branch_pred_taken;
-        uint32_t pred_context = entry.branch_pred_context;
+    const ROBEntry& entry = rob.head_entry();
 
-        // write data memory
-        if (is_store) {
-            if (!dmem.issue_write_next(
-                entry.store_addr,
-                entry.store_value,
-                entry.type
-            )) break;
+    bool is_store = entry.is_store;
+    bool is_branch = entry.is_branch;
+    uint32_t tag = entry.tag;
+    uint8_t dest_reg = entry.dest_reg;
+    uint32_t val = entry.val;
+    uint32_t entry_pc = entry.pc;
+    bool actual_taken = entry.branch_actual_taken;
+    uint32_t br_target = entry.branch_target;
+    bool pred_taken = entry.branch_pred_taken;
+    uint32_t pred_context = entry.branch_pred_context;
+
+    // write data memory
+    if (is_store) {
+        if (!dmem.issue_write_next(
+            entry.store_addr,
+            entry.store_value,
+            entry.type
+        )) return;
+    }
+
+    // write arch register
+    if (!is_store && dest_reg != 0) {
+        regf.write_reg(dest_reg, val);
+        rat.commit_clear_next(dest_reg, tag, val);
+    }
+
+    // update branch predictor
+    if (is_branch) {
+        total_branches++;
+        if (entry.type != InstrType::JAL &&
+            entry.type != InstrType::JALR) {
+            bp->update(entry_pc, pred_context, actual_taken);
         }
+    }
 
-        // write arch register
-        if (!is_store && dest_reg != 0) {
-            regf.write_reg(dest_reg, val);
-            rat.commit_clear_next(dest_reg, tag, val);
-        }
+    // ROB commit
+    bool mis = rob.commit();
 
-        // update branch predictor
-        if (is_branch) {
-            total_branches++;
-            if (entry.type != InstrType::JAL &&
-                entry.type != InstrType::JALR) {
-                bp->update(entry_pc, pred_context, actual_taken);
-            }
-        }
+    if (is_store) {
+        sb.commit_next(tag);
+    }
 
-        // ROB commit
-        bool mis = rob.commit();
+    tf.dump(entry_pc);
 
-        if (is_store) {
-            sb.commit_next(tag);
-        }
-
-        tf.dump(entry_pc);
-
-        if (mis) {
-            mispredicted_branches++;
-            squash_pending = true;
-            squash_tag = tag;
-            squash_pc = actual_taken ? br_target : (entry_pc + 4);
-            break;
-        }
-
-        // ... tf here (optional)
+    if (mis) {
+        mispredicted_branches++;
+        squash_pending = true;
+        squash_tag = tag;
+        squash_pc = actual_taken ? br_target : (entry_pc + 4);
+        return;
     }
 }
 
